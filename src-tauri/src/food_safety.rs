@@ -1,9 +1,11 @@
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::HashMap,
     fs::{self, OpenOptions},
     io::Write,
-    path::{Path, PathBuf},
-    time::UNIX_EPOCH,
+    path::{Component, Path, PathBuf},
+    sync::{Mutex, OnceLock},
+    time::{SystemTime, UNIX_EPOCH},
 };
 use tauri::{AppHandle, Manager};
 
@@ -17,6 +19,128 @@ pub struct DesktopSeatTarget {
     app_owned: bool,
 }
 
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UserFoodTarget {
+    name: String,
+    kind: String,
+    path: String,
+    selection_token: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum FoodObjectKind {
+    File,
+    Folder,
+}
+
+impl FoodObjectKind {
+    fn from_metadata(metadata: &fs::Metadata) -> Result<Self, String> {
+        if metadata.is_file() {
+            Ok(Self::File)
+        } else if metadata.is_dir() {
+            Ok(Self::Folder)
+        } else {
+            Err("目标不是普通文件或文件夹".into())
+        }
+    }
+
+    fn as_str(&self) -> &'static str {
+        match self {
+            Self::File => "file",
+            Self::Folder => "folder",
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+struct SelectedUserFood {
+    path: PathBuf,
+    kind: FoodObjectKind,
+    identity: String,
+}
+
+#[derive(Default)]
+struct FoodSelectionState {
+    next_token: u64,
+    selected: HashMap<String, SelectedUserFood>,
+}
+
+#[derive(Default)]
+struct FoodSelectionRegistry {
+    state: Mutex<FoodSelectionState>,
+}
+
+impl FoodSelectionRegistry {
+    fn inspect(&self, safety: &FoodSafety, path: &Path) -> Result<UserFoodTarget, String> {
+        let canonical = safety.validate_user_food(path)?;
+        let metadata = fs::symlink_metadata(&canonical).map_err(|error| error.to_string())?;
+        let kind = FoodObjectKind::from_metadata(&metadata)?;
+        let identity = file_identity(&metadata)?;
+        let name = canonical
+            .file_name()
+            .ok_or_else(|| "目标名称无效".to_owned())?
+            .to_string_lossy()
+            .into_owned();
+        let mut state = self
+            .state
+            .lock()
+            .map_err(|_| "文件选择状态不可用".to_owned())?;
+        state.next_token = state
+            .next_token
+            .checked_add(1)
+            .ok_or_else(|| "文件选择令牌已耗尽".to_owned())?;
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|error| error.to_string())?
+            .as_nanos();
+        let token = format!("{:x}-{:x}-{:x}", std::process::id(), now, state.next_token);
+        state.selected.insert(
+            token.clone(),
+            SelectedUserFood {
+                path: canonical.clone(),
+                kind: kind.clone(),
+                identity,
+            },
+        );
+        Ok(UserFoodTarget {
+            name,
+            kind: kind.as_str().into(),
+            path: canonical.to_string_lossy().into_owned(),
+            selection_token: token,
+        })
+    }
+
+    fn trash_with(
+        &self,
+        safety: &FoodSafety,
+        path: &Path,
+        selection_token: &str,
+        move_to_trash: impl FnOnce(&Path) -> Result<(), String>,
+    ) -> Result<(), String> {
+        let selected = self
+            .state
+            .lock()
+            .map_err(|_| "文件选择状态不可用".to_owned())?
+            .selected
+            .remove(selection_token)
+            .ok_or_else(|| "文件选择已失效".to_owned())?;
+        let canonical = safety.validate_user_food(path)?;
+        let metadata = fs::symlink_metadata(&canonical).map_err(|error| error.to_string())?;
+        let kind = FoodObjectKind::from_metadata(&metadata)?;
+        let identity = file_identity(&metadata)?;
+        if canonical != selected.path || kind != selected.kind || identity != selected.identity {
+            return Err("所选文件已被替换或路径不匹配".into());
+        }
+        move_to_trash(&canonical)
+    }
+}
+
+fn food_selections() -> &'static FoodSelectionRegistry {
+    static SELECTIONS: OnceLock<FoodSelectionRegistry> = OnceLock::new();
+    SELECTIONS.get_or_init(FoodSelectionRegistry::default)
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 struct OwnedSeat {
     path: PathBuf,
@@ -28,13 +152,16 @@ struct OwnedSeat {
 }
 
 pub struct FoodSafety {
+    home: PathBuf,
     desktop: PathBuf,
+    data: PathBuf,
     manifest: PathBuf,
     owned: Vec<OwnedSeat>,
 }
 
 impl FoodSafety {
     fn from_app(app: &AppHandle) -> Result<Self, String> {
+        let home = app.path().home_dir().map_err(|error| error.to_string())?;
         let desktop = app
             .path()
             .desktop_dir()
@@ -44,10 +171,11 @@ impl FoodSafety {
             .app_data_dir()
             .map_err(|error| error.to_string())?;
         fs::create_dir_all(&data).map_err(|error| error.to_string())?;
-        Self::new(desktop, data.join("owned-seat-files.json"))
+        Self::new(home, desktop, data)
     }
 
-    fn new(desktop: PathBuf, manifest: PathBuf) -> Result<Self, String> {
+    fn new(home: PathBuf, desktop: PathBuf, data: PathBuf) -> Result<Self, String> {
+        let manifest = data.join("owned-seat-files.json");
         let owned = match fs::read(&manifest) {
             Ok(bytes) => serde_json::from_slice(&bytes).unwrap_or_else(|error| {
                 eprintln!("忽略损坏的宠物座位所有权清单（安全保留原文件）: {error}");
@@ -57,7 +185,9 @@ impl FoodSafety {
             Err(error) => return Err(error.to_string()),
         };
         Ok(Self {
-            desktop,
+            home: home.canonicalize().map_err(|error| error.to_string())?,
+            desktop: desktop.canonicalize().map_err(|error| error.to_string())?,
+            data: data.canonicalize().map_err(|error| error.to_string())?,
             manifest,
             owned,
         })
@@ -102,7 +232,7 @@ impl FoodSafety {
                         path: canonical.clone(),
                         modified_nanos: modified_nanos(&metadata)?,
                         created_nanos: created_nanos(&metadata),
-                        identity: file_identity(&metadata),
+                        identity: file_identity(&metadata)?,
                         permissions: permission_fingerprint(&metadata),
                         readonly: metadata.permissions().readonly(),
                     });
@@ -144,11 +274,35 @@ impl FoodSafety {
         }
         if modified_nanos(&metadata)? != record.modified_nanos
             || created_nanos(&metadata) != record.created_nanos
-            || file_identity(&metadata) != record.identity
+            || file_identity(&metadata)? != record.identity
             || permission_fingerprint(&metadata) != record.permissions
             || metadata.permissions().readonly() != record.readonly
         {
             return Err("座位文件已被用户修改".into());
+        }
+        Ok(canonical)
+    }
+
+    fn validate_user_food(&self, path: &Path) -> Result<PathBuf, String> {
+        let link_metadata = metadata_without_symlink_components(path)?;
+        if !link_metadata.is_file() && !link_metadata.is_dir() {
+            return Err("目标不是普通文件或文件夹".into());
+        }
+        let canonical = path.canonicalize().map_err(|error| error.to_string())?;
+        if canonical == self.home {
+            return Err("拒绝处理用户主目录".into());
+        }
+        if canonical == self.desktop {
+            return Err("拒绝处理桌面目录".into());
+        }
+        if canonical.starts_with(&self.data) || self.data.starts_with(&canonical) {
+            return Err("拒绝处理应用数据".into());
+        }
+        if canonical.parent().is_none() || is_volume_root(&canonical)? {
+            return Err("拒绝处理卷根目录".into());
+        }
+        if is_system_protected(&canonical)? {
+            return Err("拒绝处理系统目录".into());
         }
         Ok(canonical)
     }
@@ -190,6 +344,189 @@ impl FoodSafety {
     }
 }
 
+fn metadata_without_symlink_components(path: &Path) -> Result<fs::Metadata, String> {
+    if !path.is_absolute() {
+        return Err("目标路径必须是绝对路径".into());
+    }
+    let mut prefix = PathBuf::new();
+    let mut final_metadata = None;
+    for component in path.components() {
+        match component {
+            Component::Prefix(_) | Component::RootDir | Component::Normal(_) => {
+                prefix.push(component.as_os_str());
+            }
+            Component::CurDir | Component::ParentDir => {
+                return Err("目标路径包含不安全的路径组件".into());
+            }
+        }
+        if !prefix.is_absolute() {
+            continue;
+        }
+        let metadata = fs::symlink_metadata(&prefix).map_err(|error| error.to_string())?;
+        if metadata.file_type().is_symlink() {
+            return Err("拒绝处理包含符号链接的路径".into());
+        }
+        final_metadata = Some(metadata);
+    }
+    final_metadata.ok_or_else(|| "目标路径无效".to_owned())
+}
+
+#[cfg(any(windows, test))]
+fn windows_system_protected_roots_with(
+    system_root: Option<PathBuf>,
+    canonicalize: impl FnOnce(&Path) -> std::io::Result<PathBuf>,
+) -> Result<Vec<PathBuf>, String> {
+    let system_root = system_root.ok_or_else(|| "无法确定 Windows 系统目录".to_owned())?;
+    Ok(vec![
+        canonicalize(&system_root).map_err(|error| error.to_string())?
+    ])
+}
+
+fn system_protected_roots() -> Result<Vec<PathBuf>, String> {
+    #[cfg(target_os = "macos")]
+    let roots: Result<Vec<PathBuf>, String> = ["/System", "/Library", "/private"]
+        .into_iter()
+        .map(PathBuf::from)
+        .map(|root| root.canonicalize().map_err(|error| error.to_string()))
+        .collect();
+
+    #[cfg(windows)]
+    let roots = windows_system_protected_roots_with(
+        std::env::var_os("SystemRoot").map(PathBuf::from),
+        fs::canonicalize,
+    );
+
+    #[cfg(not(any(target_os = "macos", windows)))]
+    let roots = Ok(Vec::new());
+
+    roots
+}
+
+fn is_system_protected(path: &Path) -> Result<bool, String> {
+    Ok(system_protected_roots()?
+        .iter()
+        .any(|root| path.starts_with(root)))
+}
+
+#[cfg(any(target_os = "linux", test))]
+fn unescape_linux_mountinfo_field(field: &str) -> Result<String, String> {
+    let bytes = field.as_bytes();
+    let mut decoded = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index] != b'\\' {
+            decoded.push(bytes[index]);
+            index += 1;
+            continue;
+        }
+        let digits = bytes
+            .get(index + 1..index + 4)
+            .ok_or_else(|| "mountinfo 转义不完整".to_owned())?;
+        if !digits.iter().all(|digit| (b'0'..=b'7').contains(digit)) {
+            return Err("mountinfo 转义无效".into());
+        }
+        let value = u16::from(digits[0] - b'0') * 64
+            + u16::from(digits[1] - b'0') * 8
+            + u16::from(digits[2] - b'0');
+        decoded.push(u8::try_from(value).map_err(|_| "mountinfo 转义超出范围".to_owned())?);
+        index += 4;
+    }
+    String::from_utf8(decoded).map_err(|error| error.to_string())
+}
+
+#[cfg(any(target_os = "linux", test))]
+fn linux_mountinfo_has_mount_point(mountinfo: &str, path: &Path) -> Result<bool, String> {
+    let mut found = false;
+    let mut saw_line = false;
+    for line in mountinfo.lines() {
+        saw_line = true;
+        let fields: Vec<_> = line.split_ascii_whitespace().collect();
+        if fields.len() < 10 {
+            return Err("mountinfo 字段不足".into());
+        }
+        fields[0]
+            .parse::<u64>()
+            .map_err(|error| error.to_string())?;
+        fields[1]
+            .parse::<u64>()
+            .map_err(|error| error.to_string())?;
+        let mut device = fields[2].split(':');
+        device
+            .next()
+            .ok_or_else(|| "mountinfo 设备号无效".to_owned())?
+            .parse::<u64>()
+            .map_err(|error| error.to_string())?;
+        device
+            .next()
+            .ok_or_else(|| "mountinfo 设备号无效".to_owned())?
+            .parse::<u64>()
+            .map_err(|error| error.to_string())?;
+        if device.next().is_some() {
+            return Err("mountinfo 设备号无效".into());
+        }
+        unescape_linux_mountinfo_field(fields[3])?;
+        let mount_point = PathBuf::from(unescape_linux_mountinfo_field(fields[4])?);
+        if !mount_point.is_absolute() {
+            return Err("mountinfo 挂载点不是绝对路径".into());
+        }
+        let separator = fields
+            .iter()
+            .position(|field| *field == "-")
+            .ok_or_else(|| "mountinfo 缺少分隔符".to_owned())?;
+        if separator < 6 || separator + 3 >= fields.len() {
+            return Err("mountinfo 结构无效".into());
+        }
+        found |= mount_point == path;
+    }
+    if !saw_line {
+        return Err("mountinfo 为空".into());
+    }
+    Ok(found)
+}
+
+#[cfg(any(all(unix, not(target_os = "linux")), test))]
+fn unix_volume_root_with(
+    path: &Path,
+    device_of: impl Fn(&Path) -> Result<u64, String>,
+) -> Result<bool, String> {
+    let Some(parent) = path.parent() else {
+        return Ok(true);
+    };
+    Ok(device_of(path)? != device_of(parent)?)
+}
+
+#[cfg(target_os = "linux")]
+fn is_volume_root(path: &Path) -> Result<bool, String> {
+    let mountinfo =
+        fs::read_to_string("/proc/self/mountinfo").map_err(|error| error.to_string())?;
+    linux_mountinfo_has_mount_point(&mountinfo, path)
+}
+
+#[cfg(all(unix, not(target_os = "linux")))]
+fn is_volume_root(path: &Path) -> Result<bool, String> {
+    #[cfg(target_os = "macos")]
+    if path == Path::new("/Volumes") || path.parent() == Some(Path::new("/Volumes")) {
+        return Ok(true);
+    }
+
+    use std::os::unix::fs::MetadataExt;
+    unix_volume_root_with(path, |candidate| {
+        fs::metadata(candidate)
+            .map(|metadata| metadata.dev())
+            .map_err(|error| error.to_string())
+    })
+}
+
+#[cfg(windows)]
+fn is_volume_root(path: &Path) -> Result<bool, String> {
+    Ok(path.parent().is_none())
+}
+
+#[cfg(not(any(unix, windows)))]
+fn is_volume_root(path: &Path) -> Result<bool, String> {
+    Ok(path.parent().is_none())
+}
+
 fn modified_nanos(metadata: &fs::Metadata) -> Result<u64, String> {
     let nanos = metadata
         .modified()
@@ -211,15 +548,21 @@ fn created_nanos(metadata: &fs::Metadata) -> Option<u64> {
 }
 
 #[cfg(unix)]
-fn file_identity(metadata: &fs::Metadata) -> String {
+fn file_identity(metadata: &fs::Metadata) -> Result<String, String> {
     use std::os::unix::fs::MetadataExt;
-    format!("{}:{}", metadata.dev(), metadata.ino())
+    Ok(format!("{}:{}", metadata.dev(), metadata.ino()))
 }
 
 #[cfg(windows)]
-fn file_identity(metadata: &fs::Metadata) -> String {
+fn file_identity(metadata: &fs::Metadata) -> Result<String, String> {
     use std::os::windows::fs::MetadataExt;
-    format!("{}:{}", metadata.creation_time(), metadata.file_size())
+    let volume = metadata
+        .volume_serial_number()
+        .ok_or_else(|| "无法读取 Windows 卷标识".to_owned())?;
+    let index = metadata
+        .file_index()
+        .ok_or_else(|| "无法读取 Windows 文件标识".to_owned())?;
+    Ok(format!("{volume}:{index}"))
 }
 
 #[cfg(unix)]
@@ -336,6 +679,24 @@ pub fn trash_owned_seat_file(app: AppHandle, path: String) -> Result<(), String>
     })
 }
 
+#[tauri::command]
+pub fn inspect_user_food(app: AppHandle, path: String) -> Result<UserFoodTarget, String> {
+    let safety = FoodSafety::from_app(&app)?;
+    food_selections().inspect(&safety, Path::new(&path))
+}
+
+#[tauri::command]
+pub fn trash_user_food(
+    app: AppHandle,
+    path: String,
+    selection_token: String,
+) -> Result<(), String> {
+    let safety = FoodSafety::from_app(&app)?;
+    food_selections().trash_with(&safety, Path::new(&path), &selection_token, |target| {
+        trash::delete(target).map_err(|error| error.to_string())
+    })
+}
+
 pub fn cleanup_owned_seat_files(app: &AppHandle) -> Result<usize, String> {
     FoodSafety::from_app(app)?
         .cleanup_owned_with(|target| trash::delete(target).map_err(|error| error.to_string()))
@@ -355,34 +716,40 @@ mod tests {
 
     struct TestDirs {
         root: PathBuf,
+        home: PathBuf,
         desktop: PathBuf,
         data: PathBuf,
     }
 
     impl TestDirs {
         fn new() -> Self {
-            let root = std::env::temp_dir().join(format!(
-                "black-shirt-pet-{}-{}",
-                std::process::id(),
-                SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_nanos()
-                    + u128::from(NEXT_TEST_DIR.fetch_add(1, Ordering::Relaxed)),
-            ));
-            let desktop = root.join("Desktop");
+            let root = std::env::current_dir()
+                .unwrap()
+                .join("target/food-safety-tests")
+                .join(format!(
+                    "black-shirt-pet-{}-{}",
+                    std::process::id(),
+                    SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .unwrap()
+                        .as_nanos()
+                        + u128::from(NEXT_TEST_DIR.fetch_add(1, Ordering::Relaxed)),
+                ));
+            let home = root.join("Home");
+            let desktop = home.join("Desktop");
             let data = root.join("Data");
             fs::create_dir_all(&desktop).unwrap();
             fs::create_dir_all(&data).unwrap();
             Self {
                 root,
+                home,
                 desktop,
                 data,
             }
         }
 
         fn safety(&self) -> FoodSafety {
-            FoodSafety::new(self.desktop.clone(), self.data.join("owned-seats.json")).unwrap()
+            FoodSafety::new(self.home.clone(), self.desktop.clone(), self.data.clone()).unwrap()
         }
     }
 
@@ -424,6 +791,203 @@ mod tests {
     }
 
     #[test]
+    fn unchanged_selected_file_and_nonempty_folder_can_be_trashed_once() {
+        let dirs = TestDirs::new();
+        let file = dirs.desktop.join("food.txt");
+        let folder = dirs.desktop.join("FoodFolder");
+        fs::write(&file, "food").unwrap();
+        fs::create_dir(&folder).unwrap();
+        fs::write(folder.join("inside.txt"), "food").unwrap();
+        let safety = dirs.safety();
+        let selections = FoodSelectionRegistry::default();
+        let selected_file = selections.inspect(&safety, &file).unwrap();
+        let selected_folder = selections.inspect(&safety, &folder).unwrap();
+        let mut moved = Vec::new();
+        selections
+            .trash_with(&safety, &file, &selected_file.selection_token, |path| {
+                moved.push(path.to_path_buf());
+                Ok(())
+            })
+            .unwrap();
+        selections
+            .trash_with(&safety, &folder, &selected_folder.selection_token, |path| {
+                moved.push(path.to_path_buf());
+                Ok(())
+            })
+            .unwrap();
+
+        assert_eq!(
+            moved,
+            vec![file.canonicalize().unwrap(), folder.canonicalize().unwrap()]
+        );
+        assert!(selections
+            .trash_with(&safety, &file, &selected_file.selection_token, |_| Ok(()))
+            .is_err());
+    }
+
+    #[test]
+    fn replacing_selected_food_at_the_same_path_is_refused() {
+        let dirs = TestDirs::new();
+        let file = dirs.desktop.join("food.txt");
+        let original = dirs.desktop.join("original.txt");
+        fs::write(&file, "original").unwrap();
+        let safety = dirs.safety();
+        let selections = FoodSelectionRegistry::default();
+        let selected = selections.inspect(&safety, &file).unwrap();
+        fs::rename(&file, &original).unwrap();
+        fs::write(&file, "replacement").unwrap();
+        let mut moved = false;
+
+        assert!(selections
+            .trash_with(&safety, &file, &selected.selection_token, |_| {
+                moved = true;
+                Ok(())
+            })
+            .is_err());
+        assert!(!moved);
+        assert_eq!(fs::read_to_string(&file).unwrap(), "replacement");
+    }
+
+    #[test]
+    fn selection_token_cannot_be_used_for_a_different_path_or_replayed() {
+        let dirs = TestDirs::new();
+        let first = dirs.desktop.join("first.txt");
+        let second = dirs.desktop.join("second.txt");
+        fs::write(&first, "first").unwrap();
+        fs::write(&second, "second").unwrap();
+        let safety = dirs.safety();
+        let selections = FoodSelectionRegistry::default();
+        let selected = selections.inspect(&safety, &first).unwrap();
+        let mut moved = false;
+
+        assert!(selections
+            .trash_with(&safety, &second, &selected.selection_token, |_| {
+                moved = true;
+                Ok(())
+            })
+            .is_err());
+        assert!(selections
+            .trash_with(&safety, &first, &selected.selection_token, |_| {
+                moved = true;
+                Ok(())
+            })
+            .is_err());
+        assert!(!moved);
+    }
+
+    #[test]
+    fn protected_missing_and_symlink_targets_are_rejected() {
+        let dirs = TestDirs::new();
+        fs::create_dir_all(dirs.data.join("nested")).unwrap();
+        let safety = dirs.safety();
+        assert!(safety.validate_user_food(&dirs.home).is_err());
+        assert!(safety.validate_user_food(&dirs.desktop).is_err());
+        assert!(safety.validate_user_food(&dirs.data).is_err());
+        assert!(safety
+            .validate_user_food(&dirs.data.join("nested"))
+            .is_err());
+        assert!(safety
+            .validate_user_food(&dirs.desktop.join("missing"))
+            .is_err());
+    }
+
+    #[test]
+    fn app_data_ancestors_are_rejected() {
+        let dirs = TestDirs::new();
+        let safety = dirs.safety();
+        assert!(safety
+            .validate_user_food(dirs.data.parent().unwrap())
+            .is_err());
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_system_trees_and_volume_roots_are_protected() {
+        assert!(is_system_protected(Path::new("/System/Library")).unwrap());
+        assert!(is_system_protected(Path::new("/Library")).unwrap());
+        assert!(is_system_protected(Path::new("/private/var")).unwrap());
+        assert!(is_volume_root(Path::new("/Volumes/External")).unwrap());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn unix_volume_roots_follow_device_boundaries() {
+        let mount = Path::new("/mnt/external");
+        assert!(unix_volume_root_with(mount, |path| {
+            if path == mount {
+                Ok(2)
+            } else if path == Path::new("/mnt") {
+                Ok(1)
+            } else {
+                unreachable!()
+            }
+        })
+        .unwrap());
+        assert!(!unix_volume_root_with(mount, |_| Ok(1)).unwrap());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn unix_volume_root_detection_propagates_metadata_errors() {
+        assert!(unix_volume_root_with(Path::new("/mnt/external"), |_| {
+            Err("metadata unavailable".into())
+        })
+        .is_err());
+    }
+
+    #[test]
+    fn linux_mountinfo_detects_same_device_mount_points() {
+        let mountinfo = "36 29 0:42 /source /mnt/bind rw - ext4 /dev/root rw\n";
+        assert!(linux_mountinfo_has_mount_point(mountinfo, Path::new("/mnt/bind")).unwrap());
+    }
+
+    #[test]
+    fn linux_mountinfo_does_not_match_non_mount_paths() {
+        let mountinfo = "36 29 0:42 /source /mnt/bind rw - ext4 /dev/root rw\n";
+        assert!(!linux_mountinfo_has_mount_point(mountinfo, Path::new("/mnt/plain")).unwrap());
+    }
+
+    #[test]
+    fn linux_mountinfo_unescapes_space_and_backslash() {
+        let mountinfo = concat!(
+            r"36 29 0:42 / /mnt/My\040Drive rw - ext4 /dev/root rw",
+            "\n",
+            r"37 29 0:42 / /mnt/back\134slash rw - ext4 /dev/root rw",
+            "\n",
+        );
+        assert!(linux_mountinfo_has_mount_point(mountinfo, Path::new("/mnt/My Drive")).unwrap());
+        assert!(linux_mountinfo_has_mount_point(mountinfo, Path::new(r"/mnt/back\slash")).unwrap());
+    }
+
+    #[test]
+    fn linux_mountinfo_rejects_malformed_lines() {
+        assert!(
+            linux_mountinfo_has_mount_point("not a mountinfo line\n", Path::new("/mnt/bind"))
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn linux_mountinfo_rejects_malformed_escapes() {
+        let mountinfo = r"36 29 0:42 / /mnt/bad\04x rw - ext4 /dev/root rw";
+        assert!(linux_mountinfo_has_mount_point(mountinfo, Path::new("/mnt/bad")).is_err());
+    }
+
+    #[test]
+    fn windows_system_roots_fail_closed_without_system_root() {
+        let roots = windows_system_protected_roots_with(None, |_| Ok(PathBuf::from("unused")));
+        assert!(roots.is_err());
+    }
+
+    #[test]
+    fn windows_system_roots_fail_closed_when_canonicalize_fails() {
+        let roots = windows_system_protected_roots_with(Some(PathBuf::from(r"C:\Windows")), |_| {
+            Err(std::io::Error::new(std::io::ErrorKind::NotFound, "missing"))
+        });
+        assert!(roots.is_err());
+    }
+
+    #[test]
     fn changed_nonempty_and_outside_files_are_refused() {
         let dirs = TestDirs::new();
         let mut safety = dirs.safety();
@@ -449,7 +1013,7 @@ mod tests {
     #[test]
     fn malformed_manifest_fails_closed_without_crashing() {
         let dirs = TestDirs::new();
-        fs::write(dirs.data.join("owned-seats.json"), "{").unwrap();
+        fs::write(dirs.data.join("owned-seat-files.json"), "{").unwrap();
         let safety = dirs.safety();
         assert!(safety.owned.is_empty());
     }
@@ -479,6 +1043,42 @@ mod tests {
         fs::write(&target, []).unwrap();
         std::os::unix::fs::symlink(&target, &link).unwrap();
         assert!(safety.validate_owned(&link).is_err());
+        assert!(safety.validate_user_food(&link).is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn symlinked_parent_components_are_refused() {
+        let dirs = TestDirs::new();
+        let safety = dirs.safety();
+        let documents = dirs.home.join("Documents");
+        let route = dirs.desktop.join("route");
+        fs::create_dir(&documents).unwrap();
+        fs::write(documents.join("food.txt"), "food").unwrap();
+        std::os::unix::fs::symlink(&documents, &route).unwrap();
+        assert!(safety.validate_user_food(&route.join("food.txt")).is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn symlinked_folder_with_trailing_separator_is_refused() {
+        let dirs = TestDirs::new();
+        let safety = dirs.safety();
+        let folder = dirs.home.join("Documents");
+        let link = dirs.desktop.join("link");
+        fs::create_dir(&folder).unwrap();
+        std::os::unix::fs::symlink(&folder, &link).unwrap();
+        let path = PathBuf::from(format!("{}/", link.display()));
+        assert!(safety.validate_user_food(&path).is_err());
+    }
+
+    #[test]
+    fn relative_user_food_paths_are_rejected() {
+        let dirs = TestDirs::new();
+        let file = dirs.desktop.join("relative-food.txt");
+        fs::write(&file, "food").unwrap();
+        let relative = file.strip_prefix(std::env::current_dir().unwrap()).unwrap();
+        assert!(dirs.safety().validate_user_food(relative).is_err());
     }
 
     #[test]

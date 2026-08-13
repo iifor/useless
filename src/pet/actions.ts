@@ -6,6 +6,9 @@ export enum PetAction {
   WALK_SLOW = "WALK_SLOW",
   SEARCH_SEAT = "SEARCH_SEAT",
   SEAT_ON_ITEM = "SEAT_ON_ITEM",
+  LOOK_AT_FILE = "LOOK_AT_FILE",
+  ASK_CONFIRM = "ASK_CONFIRM",
+  EAT_NORMAL = "EAT_NORMAL",
 }
 
 export type Direction = "left" | "right";
@@ -43,6 +46,24 @@ export const shouldCreateSeat = (
 ): boolean => candidateCount === 0 || random() < 0.1;
 
 export const manualAction = (action: PetAction): ActionSelection => ({ auto: false, action });
+
+export const dragResumeAction = (
+  automatic: boolean,
+  current: PetAction,
+  manual: PetAction,
+): PetAction => automatic ? current : manual;
+
+export const shouldResumeAfterDrag = (foodActive: boolean): boolean => !foodActive;
+
+export const foodResumeAction = (
+  automatic: boolean,
+  manual: PetAction,
+): PetAction => automatic ? PetAction.IDLE_STAND : manual;
+
+export const shouldClearSeatAfterAction = (
+  automatic: boolean,
+  action: PetAction,
+): boolean => automatic && action === PetAction.SEAT_ON_ITEM;
 
 export const resumeAutomatic = (): ActionSelection => ({
   auto: true,

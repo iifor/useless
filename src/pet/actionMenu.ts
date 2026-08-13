@@ -1,15 +1,31 @@
 import { PetAction } from "./actions";
 import type { Point, Size } from "./windowMotion";
 
+export const MANUAL_ACTIONS = [
+  PetAction.IDLE_STAND,
+  PetAction.IDLE_SIT,
+  PetAction.IDLE_PRONE,
+  PetAction.IDLE_LIE,
+  PetAction.WALK_SLOW,
+  PetAction.SEARCH_SEAT,
+  PetAction.SEAT_ON_ITEM,
+] as const;
+
+export type ManualAction = typeof MANUAL_ACTIONS[number];
+
+const MANUAL_ACTION_LABELS: Record<ManualAction, string> = {
+  [PetAction.IDLE_STAND]: "站着",
+  [PetAction.IDLE_SIT]: "坐着",
+  [PetAction.IDLE_PRONE]: "趴着",
+  [PetAction.IDLE_LIE]: "侧躺",
+  [PetAction.WALK_SLOW]: "慢慢走",
+  [PetAction.SEARCH_SEAT]: "寻找桌面座位",
+  [PetAction.SEAT_ON_ITEM]: "坐在图标上",
+};
+
 export const ACTION_MENU_ITEMS = [
   { value: "AUTO", label: "自动模式" },
-  { value: PetAction.IDLE_STAND, label: "站着" },
-  { value: PetAction.IDLE_SIT, label: "坐着" },
-  { value: PetAction.IDLE_PRONE, label: "趴着" },
-  { value: PetAction.IDLE_LIE, label: "侧躺" },
-  { value: PetAction.WALK_SLOW, label: "慢慢走" },
-  { value: PetAction.SEARCH_SEAT, label: "寻找桌面座位" },
-  { value: PetAction.SEAT_ON_ITEM, label: "坐在图标上" },
+  ...MANUAL_ACTIONS.map((value) => ({ value, label: MANUAL_ACTION_LABELS[value] })),
 ] as const;
 
 export const ROOT_MENU_ITEMS = [
@@ -34,6 +50,42 @@ export function submenuSide(
   margin: number,
 ): "left" | "right" {
   return rootX + rootWidth + submenuWidth + margin <= windowWidth ? "right" : "left";
+}
+
+export function submenuPlacement(
+  rootX: number,
+  rootWidth: number,
+  submenuWidth: number,
+  windowWidth: number,
+  margin: number,
+): { rootX: number; side: "left" | "right" } {
+  const rightRootX = Math.min(
+    Math.max(rootX, 0),
+    windowWidth - rootWidth - submenuWidth - margin,
+  );
+  const leftRootX = Math.min(
+    Math.max(rootX, submenuWidth + margin),
+    windowWidth - rootWidth,
+  );
+  return Math.abs(rootX - rightRootX) <= Math.abs(rootX - leftRootX)
+    ? { rootX: rightRootX, side: "right" }
+    : { rootX: leftRootX, side: "left" };
+}
+
+export function submenuTop(
+  rootY: number,
+  itemIndex: number,
+  itemHeight: number,
+  submenuHeight: number,
+  windowHeight: number,
+  margin: number,
+): number {
+  const desiredTop = rootY + itemIndex * itemHeight;
+  const windowTop = Math.min(
+    Math.max(desiredTop, margin),
+    windowHeight - submenuHeight - margin,
+  );
+  return windowTop - rootY;
 }
 
 export function clampMenuPosition(

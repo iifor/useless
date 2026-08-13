@@ -34,7 +34,7 @@ test("maps CSS pointer coordinates to canvas pixels", () => {
 });
 
 test("defines a usable animation for every pet pose", () => {
-  expect(PET_POSES).toHaveLength(8);
+  expect(PET_POSES).toHaveLength(9);
   for (const pose of PET_POSES) {
     const animation = ANIMATIONS[pose];
     expect(animation.source).toMatch(/\.(png|webp)$/);

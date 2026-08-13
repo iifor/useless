@@ -20,7 +20,7 @@ export interface PetRendererProps {
   pose: PetPose;
   scale: number;
   onDragStart?: () => void;
-  onDragEnd?: () => void;
+  onDragEnd?: () => void | Promise<void>;
   onBodyContextMenu?: (point: Point) => void;
 }
 
@@ -139,7 +139,7 @@ export default function PetRenderer({
     try {
       await getCurrentWindow().startDragging();
     } finally {
-      onDragEnd?.();
+      await onDragEnd?.();
     }
   };
 
@@ -152,7 +152,7 @@ export default function PetRenderer({
 
   return (
     <canvas
-      aria-label="黑衣小伙伴"
+      aria-label="UNO"
       className="pet-canvas"
       onContextMenu={openContextMenu}
       onPointerDown={(event) => { void startDragging(event); }}

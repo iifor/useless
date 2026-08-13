@@ -3,10 +3,14 @@ import { describe, expect, test } from "vitest";
 import {
   PetAction,
   actionDurationMs,
+  dragResumeAction,
+  foodResumeAction,
   manualAction,
   nextAction,
   resumeAutomatic,
+  shouldClearSeatAfterAction,
   shouldCreateSeat,
+  shouldResumeAfterDrag,
 } from "./actions";
 import {
   clampWindowTarget,
@@ -14,7 +18,7 @@ import {
   randomWalkTarget,
   stepTowards,
 } from "./windowMotion";
-import { poseForAction } from "./animations";
+import { ANIMATIONS, poseForAction } from "./animations";
 
 describe("action scheduling", () => {
   test("keeps stationary actions between 30 seconds and 5 minutes", () => {
@@ -47,11 +51,46 @@ describe("action scheduling", () => {
     expect(resumeAutomatic()).toEqual({ auto: true, action: PetAction.IDLE_STAND });
   });
 
+  test("keeps the visible automatic action after dragging", () => {
+    expect(dragResumeAction(true, PetAction.IDLE_PRONE, PetAction.IDLE_STAND))
+      .toBe(PetAction.IDLE_PRONE);
+  });
+
+  test("keeps the selected manual action after dragging", () => {
+    expect(dragResumeAction(false, PetAction.WALK_SLOW, PetAction.IDLE_LIE))
+      .toBe(PetAction.IDLE_LIE);
+  });
+
+  test("does not let a drag continuation restart scheduling while the picker is pending", () => {
+    expect(shouldResumeAfterDrag(true)).toBe(false);
+    expect(shouldResumeAfterDrag(false)).toBe(true);
+  });
+
+  test("automatic food completion resumes from standing", () => {
+    expect(foodResumeAction(true, PetAction.IDLE_LIE)).toBe(PetAction.IDLE_STAND);
+    expect(foodResumeAction(false, PetAction.IDLE_LIE)).toBe(PetAction.IDLE_LIE);
+  });
+
+  test("clears the seat after an automatic seated action completes", () => {
+    expect(shouldClearSeatAfterAction(true, PetAction.SEAT_ON_ITEM)).toBe(true);
+  });
+
+  test("keeps the seat for a manual seated action", () => {
+    expect(shouldClearSeatAfterAction(false, PetAction.SEAT_ON_ITEM)).toBe(false);
+  });
+
   test("maps every action to a valid animation pose", () => {
     for (const action of Object.values(PetAction)) {
       expect(poseForAction(action, "left")).toBeTruthy();
       expect(poseForAction(action, "right")).toBeTruthy();
     }
+  });
+
+  test("maps food actions to valid poses", () => {
+    expect(poseForAction(PetAction.LOOK_AT_FILE, "right")).toBe("idle-stand");
+    expect(poseForAction(PetAction.ASK_CONFIRM, "right")).toBe("idle-stand");
+    expect(poseForAction(PetAction.EAT_NORMAL, "right")).toBe("eat-normal");
+    expect(ANIMATIONS["eat-normal"].frameCount).toBe(4);
   });
 });
 

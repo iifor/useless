@@ -3,7 +3,13 @@ import { emitTo } from "@tauri-apps/api/event";
 import { currentMonitor, getCurrentWindow, Window } from "@tauri-apps/api/window";
 
 import type { Direction } from "./actions";
-import { directionForMove, randomWalkTarget, stepTowards, type Point } from "./windowMotion";
+import {
+  clampWindowTarget,
+  directionForMove,
+  randomWalkTarget,
+  stepTowards,
+  type Point,
+} from "./windowMotion";
 
 const SPEED_CSS_PX_PER_SECOND = 36;
 let seatBubbleOwner = 0;
@@ -28,6 +34,26 @@ export async function randomWindowDestination(random = Math.random): Promise<Poi
   );
 }
 
+export async function containCurrentWindow(): Promise<void> {
+  if (!("__TAURI_INTERNALS__" in window)) return;
+  const petWindow = getCurrentWindow();
+  const [position, size, monitor] = await Promise.all([
+    petWindow.outerPosition(),
+    petWindow.outerSize(),
+    currentMonitor(),
+  ]);
+  if (!monitor) return;
+  const target = clampWindowTarget(
+    position,
+    { ...monitor.workArea.position, ...monitor.workArea.size },
+    size,
+    0,
+  );
+  if (target.x !== position.x || target.y !== position.y) {
+    await petWindow.setPosition(new PhysicalPosition(target.x, target.y));
+  }
+}
+
 export async function moveWindowTo(
   target: Point,
   signal: AbortSignal,
@@ -35,19 +61,29 @@ export async function moveWindowTo(
 ): Promise<void> {
   if (!("__TAURI_INTERNALS__" in window)) return;
   const petWindow = getCurrentWindow();
-  const monitor = await currentMonitor();
+  const [size, monitor] = await Promise.all([petWindow.outerSize(), currentMonitor()]);
   if (!monitor) return;
 
+  const safeTarget = clampWindowTarget(
+    target,
+    { ...monitor.workArea.position, ...monitor.workArea.size },
+    size,
+    0,
+  );
+
   let current: Point = await petWindow.outerPosition();
-  onDirection(directionForMove(current, target));
+  onDirection(directionForMove(current, safeTarget));
   let last = performance.now();
-  while (!signal.aborted && Math.hypot(target.x - current.x, target.y - current.y) > 0.5) {
+  while (!signal.aborted && Math.hypot(safeTarget.x - current.x, safeTarget.y - current.y) > 0.5) {
     const now = performance.now();
     const distance = SPEED_CSS_PX_PER_SECOND * monitor.scaleFactor * (now - last) / 1000;
-    current = stepTowards(current, target, distance);
+    current = stepTowards(current, safeTarget, distance);
     await petWindow.setPosition(new PhysicalPosition(Math.round(current.x), Math.round(current.y)));
     last = now;
     await delay(33, signal);
+  }
+  if (!signal.aborted) {
+    await petWindow.setPosition(new PhysicalPosition(Math.round(safeTarget.x), Math.round(safeTarget.y)));
   }
 }
 

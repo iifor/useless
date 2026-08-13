@@ -1,15 +1,32 @@
 import { useEffect, useRef, useState } from "react";
 
-import { PetAction, actionDurationMs, nextAction } from "./pet/actions";
+import {
+  PetAction,
+  actionDurationMs,
+  dragResumeAction,
+  foodResumeAction,
+  nextAction,
+  shouldClearSeatAfterAction,
+  shouldResumeAfterDrag,
+} from "./pet/actions";
 import { poseForAction } from "./pet/animations";
+import FoodInteraction, {
+  beginFoodActivity,
+  endFoodActivity,
+  runFoodDecision,
+  runFoodSelection,
+} from "./pet/FoodInteraction";
+import { finishFood, type FoodFlow } from "./pet/foodFlow";
+import { pickFood, trashFood, type FoodPickerKind } from "./pet/foodPicker";
 import PetActionMenu from "./pet/PetActionMenu";
-import type { ActionMenuValue } from "./pet/actionMenu";
+import type { ActionMenuValue, ManualAction } from "./pet/actionMenu";
 import { findSeatTarget, releaseSeatTarget, type DesktopSeatTarget } from "./pet/desktopSeat";
 import PetRenderer from "./pet/PetRenderer";
 import { SeatIcon } from "./pet/SeatIcon";
 import {
   delay,
   claimSeatTargetBubble,
+  containCurrentWindow,
   hideSeatTargetBubble,
   moveWindowTo,
   randomWindowDestination,
@@ -17,15 +34,22 @@ import {
 } from "./pet/WindowMover";
 import type { Point } from "./pet/windowMotion";
 
+const waitForFood = (milliseconds: number) =>
+  new Promise<void>((resolve) => window.setTimeout(resolve, milliseconds));
+
 export default function App() {
   const [action, setAction] = useState(PetAction.IDLE_STAND);
   const [direction, setDirection] = useState<"left" | "right">("right");
   const [seat, setSeat] = useState<DesktopSeatTarget | null>(null);
   const [automatic, setAutomatic] = useState(true);
-  const [manual, setManual] = useState(PetAction.IDLE_STAND);
+  const [manual, setManual] = useState<ManualAction>(PetAction.IDLE_STAND);
   const [revision, setRevision] = useState(0);
   const [menuPoint, setMenuPoint] = useState<Point | null>(null);
+  const [foodFlow, setFoodFlow] = useState<FoodFlow>(finishFood);
   const active = useRef<AbortController | null>(null);
+  const dragResume = useRef<PetAction | null>(null);
+  const foodFlowRef = useRef<FoodFlow>(finishFood());
+  const foodActive = useRef(false);
 
   useEffect(() => {
     setMenuPoint(null);
@@ -77,6 +101,8 @@ export default function App() {
     };
 
     const run = async () => {
+      const resumedAction = dragResume.current;
+      dragResume.current = null;
       if (!automatic) {
         setAction(manual);
         if (manual === PetAction.WALK_SLOW) {
@@ -91,13 +117,16 @@ export default function App() {
         return;
       }
 
-      let current = PetAction.IDLE_STAND;
+      let current = resumedAction ?? PetAction.IDLE_STAND;
       while (!signal.aborted) {
         try {
           setAction(current);
           if (current === PetAction.WALK_SLOW) await walk();
           else if (current === PetAction.SEARCH_SEAT) await seatSequence();
-          else await delay(actionDurationMs(current), signal);
+          else {
+            await delay(actionDurationMs(current), signal);
+            if (isCurrent() && shouldClearSeatAfterAction(automatic, current)) setSeat(null);
+          }
           current = nextAction(current);
         } catch (error) {
           if (signal.aborted) throw error;
@@ -119,6 +148,7 @@ export default function App() {
   }, [automatic, manual, revision]);
 
   const selectMode = (value: ActionMenuValue) => {
+    if (foodActive.current) return;
     setMenuPoint(null);
     active.current?.abort();
     void hideSeatTargetBubble();
@@ -128,21 +158,56 @@ export default function App() {
       setAction(PetAction.IDLE_STAND);
     } else {
       setAutomatic(false);
-      setManual(value as PetAction);
+      setManual(value);
     }
     setRevision((value) => value + 1);
   };
 
-  const dragStart = () => {
+  const resumeAfterFood = () => {
+    const idle = finishFood();
+    foodFlowRef.current = idle;
+    setFoodFlow(idle);
+    endFoodActivity(foodActive);
+    setAction(foodResumeAction(automatic, manual));
+    setRevision((value) => value + 1);
+  };
+
+  const foodEffects = {
+    finish: resumeAfterFood,
+    setAction,
+    setFlow: setFoodFlow,
+    wait: waitForFood,
+  };
+
+  const chooseFood = (kind: FoodPickerKind): Promise<void> => {
+    if (!beginFoodActivity(foodActive)) return Promise.resolve();
+    dragResume.current = null;
     setMenuPoint(null);
     active.current?.abort();
     void hideSeatTargetBubble();
-  };
-  const dragEnd = () => {
     setSeat(null);
-    setAutomatic(true);
-    setAction(PetAction.IDLE_STAND);
-    setRevision((value) => value + 1);
+    return runFoodSelection(kind, foodFlowRef, { ...foodEffects, pick: pickFood });
+  };
+
+  const decideFood = (decision: "confirm" | "cancel") => {
+    void runFoodDecision(decision, foodFlowRef, { ...foodEffects, trash: trashFood });
+  };
+
+  const dragStart = () => {
+    setMenuPoint(null);
+    if (!shouldResumeAfterDrag(foodActive.current)) return;
+    dragResume.current = dragResumeAction(automatic, action, manual);
+    active.current?.abort();
+    void hideSeatTargetBubble();
+  };
+  const dragEnd = async () => {
+    try {
+      await containCurrentWindow();
+    } catch (error) {
+      console.error("拖动后窗口归位失败", error);
+    } finally {
+      if (shouldResumeAfterDrag(foodActive.current)) setRevision((value) => value + 1);
+    }
   };
 
   return (
@@ -150,16 +215,24 @@ export default function App() {
       <div className="pet-stage">
         {seat && <SeatIcon kind={seat.kind} />}
         <PetRenderer
-          onBodyContextMenu={setMenuPoint}
+          onBodyContextMenu={(point) => {
+            if (!foodActive.current) setMenuPoint(point);
+          }}
           onDragEnd={dragEnd}
           onDragStart={dragStart}
           pose={poseForAction(action, direction)}
           scale={1}
         />
+        <FoodInteraction
+          flow={foodFlow}
+          onCancel={() => decideFood("cancel")}
+          onConfirm={() => decideFood("confirm")}
+        />
       </div>
       {menuPoint && (
         <PetActionMenu
           onClose={() => setMenuPoint(null)}
+          onChooseFood={chooseFood}
           onSelect={selectMode}
           point={menuPoint}
           selection={automatic ? "AUTO" : manual}
