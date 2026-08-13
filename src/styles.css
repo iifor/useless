@@ -1,0 +1,146 @@
+:root {
+  font-family: system-ui, sans-serif;
+  color-scheme: light;
+  background: transparent;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root,
+main {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+  user-select: none;
+}
+
+main {
+  display: grid;
+  place-items: end center;
+}
+
+.pet-stage {
+  position: relative;
+  width: 260px;
+  height: 300px;
+}
+
+.pet-stage > .seat-icon {
+  position: absolute;
+  z-index: 0;
+  left: 98px;
+  bottom: 66px;
+}
+
+.pet-stage .pet-canvas {
+  position: relative;
+  z-index: 1;
+}
+
+.pet-canvas {
+  display: block;
+  cursor: grab;
+  touch-action: none;
+}
+
+.pet-canvas:active {
+  cursor: grabbing;
+}
+
+.action-menu {
+  position: fixed;
+  z-index: 20;
+  width: 132px;
+  padding: 6px;
+  border: 1px solid rgb(0 0 0 / 14%);
+  border-radius: 10px;
+  background: rgb(246 246 246 / 96%);
+  color: #222;
+  box-shadow: 0 5px 18px rgb(0 0 0 / 24%);
+  pointer-events: auto;
+}
+
+.action-menu-item {
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  padding: 3px 9px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #222;
+  font: 12px/1.2 system-ui, sans-serif;
+  text-align: left;
+}
+
+.action-menu-item:hover,
+.action-menu-item:focus-visible {
+  outline: none;
+  background: #1877f2;
+  color: #fff;
+}
+
+.action-menu-item[aria-checked="true"]::before {
+  content: "✓";
+  display: inline-block;
+  width: 16px;
+}
+
+.action-submenu {
+  position: absolute;
+  top: 0;
+  width: 168px;
+  max-height: 304px;
+  overflow-y: auto;
+}
+
+.action-submenu[data-side="right"] {
+  left: calc(100% + 4px);
+}
+
+.action-submenu[data-side="left"] {
+  right: calc(100% + 4px);
+}
+
+.action-menu-item:disabled {
+  opacity: 0.45;
+}
+
+.seat-icon {
+  display: block;
+  width: 64px;
+  height: 54px;
+  border: 3px solid rgb(85 92 104);
+  border-radius: 8px;
+  background: linear-gradient(145deg, #fff, #d9e0ea);
+  box-shadow: 0 4px 8px rgb(0 0 0 / 22%);
+}
+
+.seat-icon.folder {
+  border-color: #a97116;
+  background: linear-gradient(#f6c85f 0 28%, #e8aa32 28% 100%);
+}
+
+.seat-icon.folder::before {
+  content: "";
+  display: block;
+  width: 28px;
+  height: 9px;
+  margin: -10px 0 0 5px;
+  border-radius: 6px 6px 0 0;
+  background: #f6c85f;
+}
+
+.seat-target-bubble {
+  display: grid;
+  width: 100vw;
+  height: 100vh;
+  place-items: center;
+  background: transparent;
+}
