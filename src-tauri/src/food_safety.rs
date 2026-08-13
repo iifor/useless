@@ -71,12 +71,20 @@ struct FoodSelectionRegistry {
     state: Mutex<FoodSelectionState>,
 }
 
+fn food_stage_error(stage: &str, error: impl std::fmt::Display) -> String {
+    format!("[{stage}] {error}")
+}
+
+fn record_last_food_error(data: &Path, error: &str) -> Result<(), String> {
+    fs::write(data.join("last-food-error.txt"), error).map_err(|write_error| write_error.to_string())
+}
+
 impl FoodSelectionRegistry {
     fn inspect(&self, safety: &FoodSafety, path: &Path) -> Result<UserFoodTarget, String> {
         let canonical = safety.validate_user_food(path)?;
         let metadata = fs::symlink_metadata(&canonical).map_err(|error| error.to_string())?;
         let kind = FoodObjectKind::from_metadata(&metadata)?;
-        let identity = file_identity(&metadata)?;
+        let identity = file_identity(&canonical, &metadata)?;
         let name = canonical
             .file_name()
             .ok_or_else(|| "目标名称无效".to_owned())?
@@ -106,7 +114,7 @@ impl FoodSelectionRegistry {
         Ok(UserFoodTarget {
             name,
             kind: kind.as_str().into(),
-            path: canonical.to_string_lossy().into_owned(),
+            path: path.to_string_lossy().into_owned(),
             selection_token: token,
         })
     }
@@ -121,18 +129,26 @@ impl FoodSelectionRegistry {
         let selected = self
             .state
             .lock()
-            .map_err(|_| "文件选择状态不可用".to_owned())?
+            .map_err(|_| food_stage_error("确认-选择状态", "文件选择状态不可用"))?
             .selected
             .remove(selection_token)
-            .ok_or_else(|| "文件选择已失效".to_owned())?;
-        let canonical = safety.validate_user_food(path)?;
-        let metadata = fs::symlink_metadata(&canonical).map_err(|error| error.to_string())?;
-        let kind = FoodObjectKind::from_metadata(&metadata)?;
-        let identity = file_identity(&metadata)?;
+            .ok_or_else(|| food_stage_error("确认-选择令牌", "文件选择已失效"))?;
+        let canonical = safety
+            .validate_user_food(path)
+            .map_err(|error| food_stage_error("确认-路径复核", error))?;
+        let metadata = fs::symlink_metadata(&canonical)
+            .map_err(|error| food_stage_error("确认-元数据", error))?;
+        let kind = FoodObjectKind::from_metadata(&metadata)
+            .map_err(|error| food_stage_error("确认-文件类型", error))?;
+        let identity = file_identity(&canonical, &metadata)
+            .map_err(|error| food_stage_error("确认-文件身份", error))?;
         if canonical != selected.path || kind != selected.kind || identity != selected.identity {
-            return Err("所选文件已被替换或路径不匹配".into());
+            return Err(food_stage_error(
+                "确认-文件身份",
+                "所选文件已被替换或路径不匹配",
+            ));
         }
-        move_to_trash(&canonical)
+        move_to_trash(&canonical).map_err(|error| food_stage_error("确认-Windows回收站", error))
     }
 }
 
@@ -232,7 +248,7 @@ impl FoodSafety {
                         path: canonical.clone(),
                         modified_nanos: modified_nanos(&metadata)?,
                         created_nanos: created_nanos(&metadata),
-                        identity: file_identity(&metadata)?,
+                        identity: file_identity(&canonical, &metadata)?,
                         permissions: permission_fingerprint(&metadata),
                         readonly: metadata.permissions().readonly(),
                     });
@@ -274,7 +290,7 @@ impl FoodSafety {
         }
         if modified_nanos(&metadata)? != record.modified_nanos
             || created_nanos(&metadata) != record.created_nanos
-            || file_identity(&metadata)? != record.identity
+            || file_identity(&canonical, &metadata)? != record.identity
             || permission_fingerprint(&metadata) != record.permissions
             || metadata.permissions().readonly() != record.readonly
         {
@@ -393,7 +409,7 @@ fn system_protected_roots() -> Result<Vec<PathBuf>, String> {
     #[cfg(windows)]
     let roots = windows_system_protected_roots_with(
         std::env::var_os("SystemRoot").map(PathBuf::from),
-        fs::canonicalize,
+        |path| fs::canonicalize(path),
     );
 
     #[cfg(not(any(target_os = "macos", windows)))]
@@ -465,10 +481,11 @@ fn linux_mountinfo_has_mount_point(mountinfo: &str, path: &Path) -> Result<bool,
             return Err("mountinfo 设备号无效".into());
         }
         unescape_linux_mountinfo_field(fields[3])?;
-        let mount_point = PathBuf::from(unescape_linux_mountinfo_field(fields[4])?);
-        if !mount_point.is_absolute() {
+        let mount_point = unescape_linux_mountinfo_field(fields[4])?;
+        if !mount_point.starts_with('/') {
             return Err("mountinfo 挂载点不是绝对路径".into());
         }
+        let mount_point = PathBuf::from(mount_point);
         let separator = fields
             .iter()
             .position(|field| *field == "-")
@@ -548,20 +565,53 @@ fn created_nanos(metadata: &fs::Metadata) -> Option<u64> {
 }
 
 #[cfg(unix)]
-fn file_identity(metadata: &fs::Metadata) -> Result<String, String> {
+fn file_identity(_path: &Path, metadata: &fs::Metadata) -> Result<String, String> {
     use std::os::unix::fs::MetadataExt;
     Ok(format!("{}:{}", metadata.dev(), metadata.ino()))
 }
 
 #[cfg(windows)]
-fn file_identity(metadata: &fs::Metadata) -> Result<String, String> {
-    use std::os::windows::fs::MetadataExt;
-    let volume = metadata
-        .volume_serial_number()
-        .ok_or_else(|| "无法读取 Windows 卷标识".to_owned())?;
-    let index = metadata
-        .file_index()
-        .ok_or_else(|| "无法读取 Windows 文件标识".to_owned())?;
+fn file_identity(path: &Path, _metadata: &fs::Metadata) -> Result<String, String> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::{
+        Foundation::{CloseHandle, INVALID_HANDLE_VALUE},
+        Storage::FileSystem::{
+            CreateFileW, GetFileInformationByHandle, BY_HANDLE_FILE_INFORMATION,
+            FILE_FLAG_BACKUP_SEMANTICS, FILE_READ_ATTRIBUTES, FILE_SHARE_DELETE,
+            FILE_SHARE_READ, FILE_SHARE_WRITE, OPEN_EXISTING,
+        },
+    };
+
+    let wide_path: Vec<u16> = path.as_os_str().encode_wide().chain(Some(0)).collect();
+    let handle = unsafe {
+        CreateFileW(
+            wide_path.as_ptr(),
+            FILE_READ_ATTRIBUTES,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+            std::ptr::null(),
+            OPEN_EXISTING,
+            FILE_FLAG_BACKUP_SEMANTICS,
+            std::ptr::null_mut(),
+        )
+    };
+    if handle == INVALID_HANDLE_VALUE {
+        return Err(std::io::Error::last_os_error().to_string());
+    }
+
+    let mut information: BY_HANDLE_FILE_INFORMATION = unsafe { std::mem::zeroed() };
+    let query_result = unsafe { GetFileInformationByHandle(handle, &mut information) };
+    let query_error = (query_result == 0).then(std::io::Error::last_os_error);
+    let close_result = unsafe { CloseHandle(handle) };
+    if let Some(error) = query_error {
+        return Err(error.to_string());
+    }
+    if close_result == 0 {
+        return Err(std::io::Error::last_os_error().to_string());
+    }
+
+    let volume = information.dwVolumeSerialNumber;
+    let index = (u64::from(information.nFileIndexHigh) << 32)
+        | u64::from(information.nFileIndexLow);
     Ok(format!("{volume}:{index}"))
 }
 
@@ -672,11 +722,75 @@ pub fn create_owned_seat_file(app: AppHandle) -> Result<DesktopSeatTarget, Strin
     })
 }
 
+fn run_trash_operation<T>(operation: impl FnOnce() -> Result<T, String> + Send + 'static) -> Result<T, String>
+where
+    T: Send + 'static,
+{
+    std::thread::Builder::new()
+        .name("uno-trash".into())
+        .spawn(operation)
+        .map_err(|error| format!("无法启动回收站线程: {error}"))?
+        .join()
+        .map_err(|_| "回收站线程异常退出".to_owned())?
+}
+
+#[cfg(windows)]
+fn recycle_path(path: &Path) -> Result<(), String> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::UI::Shell::{
+        FOF_ALLOWUNDO, FOF_NOCONFIRMATION, FOF_NOERRORUI, FO_DELETE, SHFILEOPSTRUCTW,
+        SHFileOperationW,
+    };
+
+    let mut wide_path: Vec<u16> = path.as_os_str().encode_wide().collect();
+    let device_prefix = [b'\\' as u16, b'\\' as u16, b'?' as u16, b'\\' as u16];
+    let unc_prefix = [
+        b'\\' as u16,
+        b'\\' as u16,
+        b'?' as u16,
+        b'\\' as u16,
+        b'U' as u16,
+        b'N' as u16,
+        b'C' as u16,
+        b'\\' as u16,
+    ];
+    if wide_path.starts_with(&unc_prefix) {
+        wide_path.drain(..unc_prefix.len());
+        wide_path.splice(0..0, [b'\\' as u16, b'\\' as u16]);
+    } else if wide_path.starts_with(&device_prefix) {
+        wide_path.drain(..device_prefix.len());
+    }
+    wide_path.extend([0, 0]);
+
+    let mut operation = SHFILEOPSTRUCTW {
+        wFunc: FO_DELETE,
+        pFrom: wide_path.as_ptr(),
+        fFlags: (FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_NOERRORUI) as u16,
+        ..Default::default()
+    };
+    let result = unsafe { SHFileOperationW(&mut operation) };
+    if result != 0 {
+        return Err(format!("Windows 回收站操作失败（SHFileOperationW，代码 {result}）"));
+    }
+    if operation.fAnyOperationsAborted != 0 {
+        return Err("Windows 回收站操作被系统中止，文件已保留".into());
+    }
+    Ok(())
+}
+
+#[cfg(not(windows))]
+fn recycle_path(path: &Path) -> Result<(), String> {
+    trash::delete(path).map_err(|error| error.to_string())
+}
+
+fn move_to_trash(path: &Path) -> Result<(), String> {
+    let path = path.to_path_buf();
+    run_trash_operation(move || recycle_path(&path))
+}
+
 #[tauri::command]
 pub fn trash_owned_seat_file(app: AppHandle, path: String) -> Result<(), String> {
-    FoodSafety::from_app(&app)?.trash_owned_with(Path::new(&path), |target| {
-        trash::delete(target).map_err(|error| error.to_string())
-    })
+    FoodSafety::from_app(&app)?.trash_owned_with(Path::new(&path), move_to_trash)
 }
 
 #[tauri::command]
@@ -691,15 +805,18 @@ pub fn trash_user_food(
     path: String,
     selection_token: String,
 ) -> Result<(), String> {
-    let safety = FoodSafety::from_app(&app)?;
-    food_selections().trash_with(&safety, Path::new(&path), &selection_token, |target| {
-        trash::delete(target).map_err(|error| error.to_string())
-    })
+    let safety = FoodSafety::from_app(&app)
+        .map_err(|error| food_stage_error("确认-应用目录", error))?;
+    let result =
+        food_selections().trash_with(&safety, Path::new(&path), &selection_token, move_to_trash);
+    if let Err(error) = &result {
+        let _ = record_last_food_error(&safety.data, error);
+    }
+    result
 }
 
 pub fn cleanup_owned_seat_files(app: &AppHandle) -> Result<usize, String> {
-    FoodSafety::from_app(app)?
-        .cleanup_owned_with(|target| trash::delete(target).map_err(|error| error.to_string()))
+    FoodSafety::from_app(app)?.cleanup_owned_with(move_to_trash)
 }
 
 #[cfg(test)]
@@ -873,6 +990,32 @@ mod tests {
             })
             .is_err());
         assert!(!moved);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn canonical_path_returned_to_frontend_survives_confirmation() {
+        let dirs = TestDirs::new();
+        let file = dirs.desktop.join("frontend-roundtrip.txt");
+        fs::write(&file, "food").unwrap();
+        let safety = dirs.safety();
+        let selections = FoodSelectionRegistry::default();
+        let selected = selections.inspect(&safety, &file).unwrap();
+        let mut moved = false;
+
+        selections
+            .trash_with(
+                &safety,
+                Path::new(&selected.path),
+                &selected.selection_token,
+                |_| {
+                    moved = true;
+                    Ok(())
+                },
+            )
+            .unwrap();
+
+        assert!(moved);
     }
 
     #[test]
@@ -1090,4 +1233,70 @@ mod tests {
         assert!(safety.cleanup_owned_with(|_| Ok(())).is_ok());
         assert!(safety.cleanup_owned_with(|_| Ok(())).is_ok());
     }
+
+    #[test]
+    fn trash_operation_runs_on_a_dedicated_thread() {
+        let caller = std::thread::current().id();
+
+        run_trash_operation(move || {
+            if std::thread::current().id() == caller {
+                Err("回收站操作仍在调用线程执行".into())
+            } else {
+                Ok(())
+            }
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn trash_operation_propagates_worker_errors() {
+        assert_eq!(
+            run_trash_operation(|| Err::<(), _>("预期错误".into())),
+            Err("预期错误".into())
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_recycle_adapter_moves_a_file_to_the_recycle_bin() {
+        let directory = tempfile::tempdir().unwrap();
+        let name = format!(
+            "uno-recycle-adapter-{}-{}.txt",
+            std::process::id(),
+            NEXT_TEST_DIR.fetch_add(1, Ordering::Relaxed)
+        );
+        let path = directory.path().join(&name);
+        fs::write(&path, "UNO recycle adapter test").unwrap();
+
+        recycle_path(&path).unwrap();
+        assert!(!path.exists());
+
+        let item = trash::os_limited::list()
+            .unwrap()
+            .into_iter()
+            .find(|item| item.name == std::ffi::OsStr::new(&name))
+            .expect("generated test file was not found in the Recycle Bin");
+        trash::os_limited::restore_all([item]).unwrap();
+        assert!(path.exists());
+    }
+
+    #[test]
+    fn food_errors_identify_the_failing_stage() {
+        assert_eq!(
+            food_stage_error("确认-文件身份", "函数不正确"),
+            "[确认-文件身份] 函数不正确"
+        );
+    }
+
+    #[test]
+    fn last_food_error_is_saved_for_diagnosis() {
+        let directory = tempfile::tempdir().unwrap();
+        record_last_food_error(directory.path(), "[确认-路径复核] 函数不正确").unwrap();
+
+        assert_eq!(
+            fs::read_to_string(directory.path().join("last-food-error.txt")).unwrap(),
+            "[确认-路径复核] 函数不正确"
+        );
+    }
+
 }
