@@ -485,13 +485,16 @@ end tell
 #[cfg(windows)]
 fn platform_windows(_context: &TargetContext) -> Result<Vec<RawWindow>, String> {
     use std::{ffi::c_void, mem::size_of};
-    use windows_sys::Win32::{
-        Foundation::{BOOL, HWND, LPARAM, RECT, TRUE},
-        Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_CLOAKED, DWMWA_EXTENDED_FRAME_BOUNDS},
-        UI::WindowsAndMessaging::{
-            EnumWindows, GetClassNameW, GetForegroundWindow, GetWindowLongW, GetWindowRect,
-            GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, IsIconic,
-            IsWindowVisible, GWL_EXSTYLE, WS_EX_TOOLWINDOW,
+    use windows_sys::{
+        core::BOOL,
+        Win32::{
+            Foundation::{HWND, LPARAM, RECT, TRUE},
+            Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_CLOAKED, DWMWA_EXTENDED_FRAME_BOUNDS},
+            UI::WindowsAndMessaging::{
+                EnumWindows, GetClassNameW, GetForegroundWindow, GetWindowLongW, GetWindowRect,
+                GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, IsIconic,
+                IsWindowVisible, GWL_EXSTYLE, WS_EX_TOOLWINDOW,
+            },
         },
     };
 
@@ -518,7 +521,7 @@ fn platform_windows(_context: &TargetContext) -> Result<Vec<RawWindow>, String> 
         let mut bounds: RECT = std::mem::zeroed();
         if DwmGetWindowAttribute(
             window,
-            DWMWA_EXTENDED_FRAME_BOUNDS,
+            DWMWA_EXTENDED_FRAME_BOUNDS as u32,
             (&mut bounds as *mut RECT).cast::<c_void>(),
             size_of::<RECT>() as u32,
         ) != 0
@@ -529,7 +532,7 @@ fn platform_windows(_context: &TargetContext) -> Result<Vec<RawWindow>, String> 
         let mut cloaked = 0u32;
         let _ = DwmGetWindowAttribute(
             window,
-            DWMWA_CLOAKED,
+            DWMWA_CLOAKED as u32,
             (&mut cloaked as *mut u32).cast::<c_void>(),
             size_of::<u32>() as u32,
         );
