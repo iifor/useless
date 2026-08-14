@@ -7,9 +7,9 @@ import FoodInteraction, {
   endFoodActivity,
   runFoodDecision,
   runFoodSelection,
-} from "./FoodInteraction";
-import { PetAction } from "./actions";
-import { runMenuChoice } from "./PetActionMenu";
+} from "../../src/pet/FoodInteraction";
+import { PetAction } from "../../src/pet/actions";
+import { runMenuChoice } from "../../src/pet/PetActionMenu";
 import {
   advanceToConfirmation,
   beginFakeEat,
@@ -20,7 +20,7 @@ import {
   finishFood,
   type FoodFlow,
   type FoodTarget,
-} from "./foodFlow";
+} from "../../src/pet/foodFlow";
 
 const target = {
   name: "food.txt",

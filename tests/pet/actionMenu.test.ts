@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 
-import { PetAction } from "./actions";
+import { PetAction } from "../../src/pet/actions";
 import {
   ACTION_MENU_ITEMS,
   clampMenuPosition,
@@ -10,7 +10,7 @@ import {
   submenuPlacement,
   submenuSide,
   submenuTop,
-} from "./actionMenu";
+} from "../../src/pet/actionMenu";
 
 test("offers automatic mode and every manual action", () => {
   expect(ACTION_MENU_ITEMS.map((item) => item.value)).toEqual([

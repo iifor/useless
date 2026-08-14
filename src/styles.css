@@ -27,15 +27,16 @@ main {
 
 .pet-stage {
   position: relative;
-  width: 260px;
-  height: 300px;
+  width: fit-content;
+  height: fit-content;
 }
 
 .pet-stage > .seat-icon {
   position: absolute;
   z-index: 0;
-  left: 98px;
+  left: 50%;
   bottom: 66px;
+  transform: translateX(-50%);
 }
 
 .pet-stage .pet-canvas {
@@ -44,13 +45,13 @@ main {
 }
 
 .food-interaction {
-  position: absolute;
+  position: fixed;
   z-index: 10;
   top: 8px;
-  left: 14px;
+  left: 24px;
   width: 232px;
-  max-width: calc(100% - 28px);
-  max-height: calc(100% - 16px);
+  max-width: calc(100vw - 48px);
+  max-height: calc(100vh - 16px);
   overflow: hidden;
   padding: 8px 10px;
   border: 1px solid rgb(0 0 0 / 14%);

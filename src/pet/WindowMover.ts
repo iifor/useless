@@ -1,18 +1,75 @@
-import { PhysicalPosition } from "@tauri-apps/api/dpi";
+import { LogicalSize, PhysicalPosition } from "@tauri-apps/api/dpi";
 import { emitTo } from "@tauri-apps/api/event";
 import { currentMonitor, getCurrentWindow, Window } from "@tauri-apps/api/window";
 
 import type { Direction } from "./actions";
 import {
   clampWindowTarget,
+  bottomCenter,
   directionForMove,
+  physicalWindowSize,
+  planWalkPath,
   randomWalkTarget,
   stepTowards,
+  windowPositionForBottomCenter,
   type Point,
+  type Size,
 } from "./windowMotion";
 
 const SPEED_CSS_PX_PER_SECOND = 36;
+export const INTERACTION_WINDOW_SIZE = { width: 280, height: 320 };
 let seatBubbleOwner = 0;
+let savedCompactAnchor: Point | null = null;
+let layoutQueue: Promise<void> = Promise.resolve();
+let pendingViewportLayout: Promise<void> = Promise.resolve();
+let layoutRequest = 0;
+
+export type PetWindowMode = "compact" | "interaction";
+
+export function beginPetViewportLayout(): () => void {
+  let finish: () => void = () => {};
+  pendingViewportLayout = new Promise<void>((resolve) => { finish = resolve; });
+  return finish;
+}
+
+export function setPetWindowLayout(compactSize: Size, mode: PetWindowMode): Promise<void> {
+  const request = ++layoutRequest;
+  layoutQueue = layoutQueue.catch(() => undefined).then(async () => {
+    if (request !== layoutRequest) return;
+    if (!("__TAURI_INTERNALS__" in window)) return;
+    const petWindow = getCurrentWindow();
+    const [position, currentSize, monitor] = await Promise.all([
+      petWindow.outerPosition(),
+      petWindow.outerSize(),
+      currentMonitor(),
+    ]);
+    if (!monitor) return;
+
+    const desiredLogicalSize = mode === "interaction" ? INTERACTION_WINDOW_SIZE : compactSize;
+    const desiredPhysicalSize = physicalWindowSize(desiredLogicalSize, monitor.scaleFactor);
+    const anchor = savedCompactAnchor ?? bottomCenter(position, currentSize);
+    if (mode === "interaction" && savedCompactAnchor === null) savedCompactAnchor = anchor;
+    const targetPosition = windowPositionForBottomCenter(
+      anchor,
+      desiredPhysicalSize,
+      { ...monitor.workArea.position, ...monitor.workArea.size },
+    );
+
+    await petWindow.setSize(new LogicalSize(desiredLogicalSize.width, desiredLogicalSize.height));
+    await petWindow.setPosition(new PhysicalPosition(
+      Math.round(targetPosition.x),
+      Math.round(targetPosition.y),
+    ));
+    if (mode === "compact") savedCompactAnchor = null;
+  });
+  return layoutQueue;
+}
+
+export async function waitForPetWindowLayout(): Promise<void> {
+  await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+  await pendingViewportLayout;
+  await layoutQueue;
+}
 
 export const claimSeatTargetBubble = (): number => ++seatBubbleOwner;
 
@@ -60,30 +117,36 @@ export async function moveWindowTo(
   onDirection: (direction: Direction) => void,
 ): Promise<void> {
   if (!("__TAURI_INTERNALS__" in window)) return;
+  await waitForPetWindowLayout();
   const petWindow = getCurrentWindow();
   const [size, monitor] = await Promise.all([petWindow.outerSize(), currentMonitor()]);
   if (!monitor) return;
 
-  const safeTarget = clampWindowTarget(
+  let current: Point = await petWindow.outerPosition();
+  const waypoints = planWalkPath(
+    current,
     target,
     { ...monitor.workArea.position, ...monitor.workArea.size },
     size,
-    0,
+    monitor.scaleFactor,
   );
 
-  let current: Point = await petWindow.outerPosition();
-  onDirection(directionForMove(current, safeTarget));
-  let last = performance.now();
-  while (!signal.aborted && Math.hypot(safeTarget.x - current.x, safeTarget.y - current.y) > 0.5) {
-    const now = performance.now();
-    const distance = SPEED_CSS_PX_PER_SECOND * monitor.scaleFactor * (now - last) / 1000;
-    current = stepTowards(current, safeTarget, distance);
-    await petWindow.setPosition(new PhysicalPosition(Math.round(current.x), Math.round(current.y)));
-    last = now;
-    await delay(33, signal);
-  }
-  if (!signal.aborted) {
-    await petWindow.setPosition(new PhysicalPosition(Math.round(safeTarget.x), Math.round(safeTarget.y)));
+  for (const waypoint of waypoints) {
+    if (signal.aborted) return;
+    onDirection(directionForMove(current, waypoint));
+    let last = performance.now();
+    while (!signal.aborted && Math.hypot(waypoint.x - current.x, waypoint.y - current.y) > 0.5) {
+      const now = performance.now();
+      const distance = SPEED_CSS_PX_PER_SECOND * monitor.scaleFactor * (now - last) / 1000;
+      current = stepTowards(current, waypoint, distance);
+      await petWindow.setPosition(new PhysicalPosition(Math.round(current.x), Math.round(current.y)));
+      last = now;
+      await delay(33, signal);
+    }
+    if (!signal.aborted) {
+      current = waypoint;
+      await petWindow.setPosition(new PhysicalPosition(Math.round(current.x), Math.round(current.y)));
+    }
   }
 }
 
@@ -95,7 +158,11 @@ export async function showSeatTargetBubble(
   if (!("__TAURI_INTERNALS__" in window)) return;
   const bubble = await Window.getByLabel("seat-target");
   if (!bubble || owner !== seatBubbleOwner) return;
-  await bubble.setPosition(new PhysicalPosition(Math.round(target.x + 102), Math.round(target.y + 236)));
+  const size = await getCurrentWindow().outerSize();
+  await bubble.setPosition(new PhysicalPosition(
+    Math.round(target.x + size.width / 2 - 38),
+    Math.round(target.y + size.height - 84),
+  ));
   if (owner !== seatBubbleOwner) return;
   await emitTo("seat-target", "seat-target:update", { kind });
   if (owner !== seatBubbleOwner) return;

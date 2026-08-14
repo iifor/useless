@@ -10,6 +10,25 @@ export interface PixelPoint {
   y: number;
 }
 
+export interface ContentBounds {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+
+export interface AnimationFrameLayout {
+  bounds: ContentBounds | null;
+  anchorX: number;
+}
+
+export interface AnimationViewport {
+  width: number;
+  height: number;
+  originX: number;
+  originY: number;
+}
+
 export const atlasFrameRect = (
   row: number,
   column: number,
@@ -37,6 +56,64 @@ export const isAlphaHit = (
   pixelIndex: number,
   threshold = 16,
 ): boolean => (rgba[pixelIndex * 4 + 3] ?? 0) >= threshold;
+
+export function findAlphaBounds(
+  rgba: Uint8ClampedArray,
+  width: number,
+  height: number,
+  threshold = 16,
+): ContentBounds | null {
+  let minX = width;
+  let minY = height;
+  let maxX = -1;
+  let maxY = -1;
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      if ((rgba[(y * width + x) * 4 + 3] ?? 0) < threshold) continue;
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
+    }
+  }
+  return maxX < minX ? null : { minX, minY, maxX: maxX + 1, maxY: maxY + 1 };
+}
+
+export function normalizedContentScale(
+  bounds: readonly (ContentBounds | null)[],
+  targetLongEdge = 200,
+): number {
+  const longest = bounds.reduce((maximum, item) => item
+    ? Math.max(maximum, item.maxX - item.minX, item.maxY - item.minY)
+    : maximum, 0);
+  return longest > 0 ? targetLongEdge / longest : 1;
+}
+
+export function computeAnimationViewport(
+  frames: readonly AnimationFrameLayout[],
+  scale: number,
+  padding = 8,
+): AnimationViewport {
+  const visible = frames.filter(
+    (frame): frame is AnimationFrameLayout & { bounds: ContentBounds } => frame.bounds !== null,
+  );
+  if (visible.length === 0) {
+    return { width: padding * 2, height: padding * 2, originX: padding, originY: padding };
+  }
+
+  const contentBottom = Math.max(...visible.map(({ bounds }) => bounds.maxY));
+  const minX = Math.floor(Math.min(...visible.map(({ bounds, anchorX }) => bounds.minX - anchorX)) * scale);
+  const maxX = Math.ceil(Math.max(...visible.map(({ bounds, anchorX }) => bounds.maxX - anchorX)) * scale);
+  const minY = Math.floor(Math.min(...visible.map(({ bounds }) => bounds.minY - contentBottom)) * scale);
+  const maxY = Math.ceil(Math.max(...visible.map(({ bounds }) => bounds.maxY - contentBottom)) * scale);
+
+  return {
+    width: maxX - minX + padding * 2,
+    height: maxY - minY + padding * 2,
+    originX: padding - minX,
+    originY: padding - minY - contentBottom * scale,
+  };
+}
 
 export function horizontalContentAnchor(
   rgba: Uint8ClampedArray,

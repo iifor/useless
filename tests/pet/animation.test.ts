@@ -3,11 +3,14 @@ import { describe, expect, test } from "vitest";
 import {
   atlasFrameRect,
   canvasPixelPoint,
+  computeAnimationViewport,
+  findAlphaBounds,
   horizontalContentAnchor,
   isAlphaHit,
+  normalizedContentScale,
   stripFrameRect,
-} from "./animation";
-import { ANIMATIONS, PET_POSES } from "./animations";
+} from "../../src/pet/animation";
+import { ANIMATIONS, PET_POSES } from "../../src/pet/animations";
 
 describe("frame coordinates", () => {
   test("maps an atlas cell to its source rectangle", () => {
@@ -69,6 +72,55 @@ test("uses the upper body as a stable anchor when lower limbs move", () => {
 
   expect(horizontalContentAnchor(firstFrame, 6, 4)).toBe(2);
   expect(horizontalContentAnchor(shiftedFrame, 6, 4)).toBe(4);
+});
+
+test("finds visible content without counting transparent padding", () => {
+  const rgba = alphaRows([
+    [0, 0, 0, 0, 0],
+    [0, 255, 255, 0, 0],
+    [0, 255, 0, 0, 0],
+    [0, 0, 0, 0, 0],
+  ]);
+
+  expect(findAlphaBounds(rgba, 5, 4)).toEqual({
+    minX: 1,
+    minY: 1,
+    maxX: 3,
+    maxY: 3,
+  });
+});
+
+test("uses one scale that normalizes the largest animation frame to 200 pixels", () => {
+  expect(normalizedContentScale([
+    { minX: 10, minY: 20, maxX: 110, maxY: 170 },
+    { minX: 30, minY: 40, maxX: 230, maxY: 120 },
+  ])).toBe(1);
+
+  expect(normalizedContentScale([
+    { minX: 1, minY: 1, maxX: 101, maxY: 151 },
+  ], 180)).toBe(1.2);
+});
+
+test("crops an animation to the aligned alpha union plus eight pixels of padding", () => {
+  expect(computeAnimationViewport([
+    { bounds: { minX: 10, minY: 20, maxX: 110, maxY: 170 }, anchorX: 60 },
+    { bounds: { minX: 30, minY: 40, maxX: 230, maxY: 120 }, anchorX: 130 },
+  ], 1)).toEqual({
+    width: 216,
+    height: 166,
+    originX: 108,
+    originY: -12,
+  });
+});
+
+test("uses one stable viewport for every frame in an animation", () => {
+  const viewport = computeAnimationViewport([
+    { bounds: { minX: 40, minY: 30, maxX: 140, maxY: 180 }, anchorX: 90 },
+    { bounds: { minX: 60, minY: 30, maxX: 160, maxY: 170 }, anchorX: 110 },
+  ], 200 / 150, 8);
+
+  expect(viewport.width).toBe(150);
+  expect(viewport.height).toBe(216);
 });
 
 function alphaRows(rows: number[][]): Uint8ClampedArray {

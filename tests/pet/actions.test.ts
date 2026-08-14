@@ -11,14 +11,20 @@ import {
   shouldClearSeatAfterAction,
   shouldCreateSeat,
   shouldResumeAfterDrag,
-} from "./actions";
+} from "../../src/pet/actions";
 import {
+  bottomCenter,
   clampWindowTarget,
   directionForMove,
+  fromBottomCenter,
+  physicalWindowSize,
+  planWalkPath,
   randomWalkTarget,
+  relativeToBottomCenter,
   stepTowards,
-} from "./windowMotion";
-import { ANIMATIONS, poseForAction } from "./animations";
+  windowPositionForBottomCenter,
+} from "../../src/pet/windowMotion";
+import { ANIMATIONS, poseForAction } from "../../src/pet/animations";
 
 describe("action scheduling", () => {
   test("keeps stationary actions between 30 seconds and 5 minutes", () => {
@@ -95,6 +101,49 @@ describe("action scheduling", () => {
 });
 
 describe("window movement", () => {
+  test("keeps the same bottom-center anchor when a compact window expands", () => {
+    const anchor = bottomCenter({ x: 400, y: 300 }, { width: 100, height: 216 });
+    const expandedPosition = windowPositionForBottomCenter(
+      anchor,
+      { width: 280, height: 320 },
+      { x: 0, y: 0, width: 1440, height: 900 },
+    );
+
+    expect(anchor).toEqual({ x: 450, y: 516 });
+    expect(expandedPosition).toEqual({ x: 310, y: 196 });
+    expect(bottomCenter(expandedPosition, { width: 280, height: 320 })).toEqual(anchor);
+  });
+
+  test("clamps an expanded window at the screen edge without losing the saved compact anchor", () => {
+    const anchor = bottomCenter({ x: 880, y: 560 }, { width: 100, height: 216 });
+
+    expect(windowPositionForBottomCenter(
+      anchor,
+      { width: 280, height: 320 },
+      { x: 0, y: 0, width: 1000, height: 800 },
+    )).toEqual({ x: 720, y: 456 });
+    expect(windowPositionForBottomCenter(
+      anchor,
+      { width: 100, height: 216 },
+      { x: 0, y: 0, width: 1000, height: 800 },
+    )).toEqual({ x: 880, y: 560 });
+  });
+
+  test("converts logical viewport sizes for standard and Retina monitors", () => {
+    expect(physicalWindowSize({ width: 108, height: 216 }, 1)).toEqual({ width: 108, height: 216 });
+    expect(physicalWindowSize({ width: 108, height: 216 }, 2)).toEqual({ width: 216, height: 432 });
+  });
+
+  test("maps a body-relative context-menu point into the expanded window", () => {
+    const relative = relativeToBottomCenter(
+      { x: 80, y: 120 },
+      { width: 100, height: 216 },
+    );
+
+    expect(relative).toEqual({ x: 30, y: -96 });
+    expect(fromBottomCenter(relative, { width: 280, height: 320 })).toEqual({ x: 170, y: 224 });
+  });
+
   test("clamps a target inside the monitor work area", () => {
     expect(clampWindowTarget(
       { x: 5, y: 900 },
@@ -116,27 +165,77 @@ describe("window movement", () => {
     expect(directionForMove({ x: 2, y: 20 }, { x: 10, y: 0 })).toBe("right");
   });
 
-  test("selects a clamped walk target 120 to 480 CSS pixels away", () => {
-    const target = randomWalkTarget(
-      { x: 500, y: 400 },
-      { x: 0, y: 24, width: 1440, height: 876 },
-      { width: 280, height: 320 },
-      2,
-      values(0.5, 0),
-    );
-    expect(target).toEqual({ x: 1100, y: 400 });
+  test("varies random walk distance continuously from 240 to 720 CSS pixels", () => {
+    const workArea = { x: 0, y: 0, width: 2200, height: 1200 };
+    const windowSize = { width: 280, height: 320 };
+    const current = { x: 800, y: 400 };
+
+    const short = randomWalkTarget(current, workArea, windowSize, 1, values(0, 0.5, 0.75));
+    const middle = randomWalkTarget(current, workArea, windowSize, 1, values(0.5, 0.5, 0.75));
+    const long = randomWalkTarget(current, workArea, windowSize, 1, values(1, 0.5, 0.75));
+
+    expect(Math.hypot(short.x - current.x, short.y - current.y)).toBeCloseTo(240);
+    expect(Math.hypot(middle.x - current.x, middle.y - current.y)).toBeCloseTo(480);
+    expect(Math.hypot(long.x - current.x, long.y - current.y)).toBeCloseTo(720);
   });
 
-  test("keeps the minimum walk distance when starting at a monitor edge", () => {
-    const current = { x: 16, y: 24 };
+  test("keeps the actual random walk angle within 30 degrees after clamping", () => {
+    const current = { x: 16, y: 300 };
     const target = randomWalkTarget(
       current,
       { x: 0, y: 0, width: 1440, height: 900 },
       { width: 280, height: 320 },
       1,
-      values(0, 0.5),
+      values(0.5, 1, 0.25),
     );
-    expect(Math.hypot(target.x - current.x, target.y - current.y)).toBeGreaterThanOrEqual(120);
+    const angle = Math.atan2(Math.abs(target.y - current.y), Math.abs(target.x - current.x));
+
+    expect(angle).toBeLessThanOrEqual(Math.PI / 6 + 1e-9);
+    expect(target.x).toBeGreaterThanOrEqual(16);
+    expect(target.y).toBeGreaterThanOrEqual(16);
+  });
+
+  test("plans low-slope waypoints for a vertically aligned target", () => {
+    const current = { x: 500, y: 100 };
+    const target = { x: 500, y: 500 };
+    const path = planWalkPath(
+      current,
+      target,
+      { x: 0, y: 0, width: 1440, height: 900 },
+      { width: 280, height: 320 },
+      1,
+    );
+    expect(path.at(-1)).toEqual(target);
+
+    let start = current;
+    for (const waypoint of path) {
+      const angle = Math.atan2(
+        Math.abs(waypoint.y - start.y),
+        Math.abs(waypoint.x - start.x),
+      );
+      expect(angle).toBeLessThanOrEqual(Math.PI / 6 + 1e-9);
+      start = waypoint;
+    }
+  });
+
+  test("uses one segment for a target already within 30 degrees", () => {
+    expect(planWalkPath(
+      { x: 100, y: 100 },
+      { x: 500, y: 200 },
+      { x: 0, y: 0, width: 1440, height: 900 },
+      { width: 280, height: 320 },
+      1,
+    )).toEqual([{ x: 500, y: 200 }]);
+  });
+
+  test("does not attempt a pure vertical move without horizontal room", () => {
+    expect(planWalkPath(
+      { x: 0, y: 100 },
+      { x: 0, y: 400 },
+      { x: 0, y: 0, width: 280, height: 900 },
+      { width: 280, height: 320 },
+      1,
+    )).toEqual([]);
   });
 });
 
