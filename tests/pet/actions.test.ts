@@ -32,6 +32,12 @@ describe("action scheduling", () => {
     expect(actionDurationMs(PetAction.IDLE_LIE, () => 0.999)).toBeLessThanOrEqual(300_000);
   });
 
+  test("plays the seat-search animation for two to four seconds", () => {
+    expect(actionDurationMs(PetAction.SEARCH_SEAT, () => 0)).toBe(2_000);
+    expect(actionDurationMs(PetAction.SEARCH_SEAT, () => 0.999)).toBeLessThanOrEqual(4_000);
+    expect(actionDurationMs(PetAction.SEARCH_SEAT, () => 0.999)).toBeGreaterThan(2_000);
+  });
+
   test("selects the seat action below the 8 percent boundary", () => {
     const random = values(0.079);
     expect(nextAction(PetAction.IDLE_STAND, random)).toBe(PetAction.SEARCH_SEAT);
@@ -97,6 +103,11 @@ describe("action scheduling", () => {
     expect(poseForAction(PetAction.ASK_CONFIRM, "right")).toBe("idle-stand");
     expect(poseForAction(PetAction.EAT_NORMAL, "right")).toBe("eat-normal");
     expect(ANIMATIONS["eat-normal"].frameCount).toBe(4);
+  });
+
+  test("uses a dedicated four-frame animation while searching for a seat", () => {
+    expect(poseForAction(PetAction.SEARCH_SEAT, "right")).toBe("search-seat");
+    expect(ANIMATIONS["search-seat"].frameCount).toBe(4);
   });
 });
 

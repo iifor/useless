@@ -1,5 +1,8 @@
 {
   "bundle": {
-    "targets": ["app"]
+    "targets": ["app"],
+    "macOS": {
+      "entitlements": "entitlements.plist"
+    }
   }
 }

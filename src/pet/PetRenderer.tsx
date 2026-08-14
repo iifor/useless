@@ -12,13 +12,12 @@ import {
   stripFrameRect,
   type ContentBounds,
 } from "./animation";
-import { ANIMATIONS, type PetPose } from "./animations";
+import { ANIMATIONS, contentLongEdgeForPose, type PetPose } from "./animations";
 import { beginPetViewportLayout } from "./WindowMover";
 import type { Point, Size } from "./windowMotion";
 
 const ATLAS_CELL_WIDTH = 192;
 const ATLAS_CELL_HEIGHT = 208;
-const CONTENT_LONG_EDGE = 200;
 const CONTENT_PADDING = 8;
 const DEFAULT_VIEWPORT_SIZE = 216;
 
@@ -54,6 +53,7 @@ export default function PetRenderer({
     if (!context) return;
 
     const spec = ANIMATIONS[pose];
+    const targetLongEdge = contentLongEdgeForPose(pose);
     const image = new Image();
     const finishViewportLayout = beginPetViewportLayout();
     let frame = 0;
@@ -118,7 +118,7 @@ export default function PetRenderer({
         frameAnchors = frames.map(({ anchor }) => anchor);
         contentScale = normalizedContentScale(
           frames.map(({ bounds }) => bounds),
-          CONTENT_LONG_EDGE,
+          targetLongEdge,
         );
       } else {
         const source = sourceFor(0);
@@ -127,7 +127,7 @@ export default function PetRenderer({
           bounds: { minX: 0, minY: 0, maxX: source.width, maxY: source.height },
         }));
         frameAnchors = frames.map(({ anchor }) => anchor);
-        contentScale = CONTENT_LONG_EDGE / Math.max(source.width, source.height);
+        contentScale = targetLongEdge / Math.max(source.width, source.height);
       }
 
       const viewport = computeAnimationViewport(

@@ -12,6 +12,7 @@ import {
   randomWalkTarget,
   stepTowards,
   windowPositionForBottomCenter,
+  windowPositionForSeatAnchor,
   type Point,
   type Size,
 } from "./windowMotion";
@@ -111,6 +112,18 @@ export async function containCurrentWindow(): Promise<void> {
   }
 }
 
+export async function seatWindowDestination(anchor: Point): Promise<Point> {
+  if (!("__TAURI_INTERNALS__" in window)) return anchor;
+  const petWindow = getCurrentWindow();
+  const [size, monitor] = await Promise.all([petWindow.outerSize(), currentMonitor()]);
+  if (!monitor) return petWindow.outerPosition();
+  return windowPositionForSeatAnchor(
+    anchor,
+    size,
+    { ...monitor.workArea.position, ...monitor.workArea.size },
+  );
+}
+
 export async function moveWindowTo(
   target: Point,
   signal: AbortSignal,
@@ -153,7 +166,7 @@ export async function moveWindowTo(
 export async function showSeatTargetBubble(
   owner: number,
   target: Point,
-  kind: "file" | "folder" | "owned-temp" | "virtual",
+  kind: "file" | "folder" | "owned-temp" | "window" | "virtual",
 ) {
   if (!("__TAURI_INTERNALS__" in window)) return;
   const bubble = await Window.getByLabel("seat-target");

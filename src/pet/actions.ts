@@ -35,7 +35,7 @@ export function nextAction(current: PetAction, random = Math.random): PetAction 
 
 export function actionDurationMs(action: PetAction, random = Math.random): number {
   if (action === PetAction.SEAT_ON_ITEM) return 30_000 + random() * 60_000;
-  if (action === PetAction.SEARCH_SEAT) return 2_000;
+  if (action === PetAction.SEARCH_SEAT) return 2_000 + random() * 2_000;
   if (action === PetAction.WALK_SLOW) return 0;
   return 30_000 + random() * 270_000;
 }

@@ -11,16 +11,6 @@ use tauri::{AppHandle, Manager};
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct DesktopSeatTarget {
-    id: String,
-    name: String,
-    kind: String,
-    path: Option<String>,
-    app_owned: bool,
-}
-
-#[derive(Clone, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
 pub struct UserFoodTarget {
     name: String,
     kind: String,
@@ -627,7 +617,7 @@ fn permission_fingerprint(metadata: &fs::Metadata) -> u64 {
     u64::from(metadata.file_attributes())
 }
 
-fn is_application_name(name: &str) -> bool {
+pub(crate) fn is_application_name(name: &str) -> bool {
     let lower = name.to_ascii_lowercase();
     [
         ".app",
@@ -657,69 +647,29 @@ fn is_application_name(name: &str) -> bool {
 }
 
 #[cfg(target_os = "macos")]
-fn is_os_hidden(metadata: &fs::Metadata) -> bool {
+pub(crate) fn is_os_hidden(metadata: &fs::Metadata) -> bool {
     use std::os::macos::fs::MetadataExt;
     metadata.st_flags() & 0x0000_8000 != 0
 }
 
 #[cfg(windows)]
-fn is_os_hidden(metadata: &fs::Metadata) -> bool {
+pub(crate) fn is_os_hidden(metadata: &fs::Metadata) -> bool {
     use std::os::windows::fs::MetadataExt;
     metadata.file_attributes() & (0x2 | 0x4) != 0
 }
 
 #[cfg(not(any(target_os = "macos", windows)))]
-fn is_os_hidden(_metadata: &fs::Metadata) -> bool {
+pub(crate) fn is_os_hidden(_metadata: &fs::Metadata) -> bool {
     false
 }
 
 #[tauri::command]
-pub fn find_seat_candidates(app: AppHandle) -> Result<Vec<DesktopSeatTarget>, String> {
-    let safety = FoodSafety::from_app(&app)?;
-    let entries = fs::read_dir(&safety.desktop).map_err(|error| error.to_string())?;
-    let mut targets = Vec::new();
-    for entry in entries.flatten() {
-        let name = entry.file_name().to_string_lossy().into_owned();
-        if name.starts_with('.') || is_application_name(&name) {
-            continue;
-        }
-        let metadata = match fs::symlink_metadata(entry.path()) {
-            Ok(value) => value,
-            Err(_) => continue,
-        };
-        if metadata.file_type().is_symlink() || (!metadata.is_file() && !metadata.is_dir()) {
-            continue;
-        }
-        if is_os_hidden(&metadata) {
-            continue;
-        }
-        let path = entry.path();
-        targets.push(DesktopSeatTarget {
-            id: path.to_string_lossy().into_owned(),
-            name,
-            kind: if metadata.is_dir() { "folder" } else { "file" }.into(),
-            path: Some(path.to_string_lossy().into_owned()),
-            app_owned: false,
-        });
-    }
-    Ok(targets)
-}
-
-#[tauri::command]
-pub fn create_owned_seat_file(app: AppHandle) -> Result<DesktopSeatTarget, String> {
+pub fn create_owned_seat_file(
+    app: AppHandle,
+) -> Result<crate::desktop_targets::DesktopSeatTarget, String> {
     let mut safety = FoodSafety::from_app(&app)?;
     let path = safety.create_owned_seat_file()?;
-    Ok(DesktopSeatTarget {
-        id: path.to_string_lossy().into_owned(),
-        name: path
-            .file_name()
-            .unwrap_or_default()
-            .to_string_lossy()
-            .into_owned(),
-        kind: "owned-temp".into(),
-        path: Some(path.to_string_lossy().into_owned()),
-        app_owned: true,
-    })
+    Ok(crate::desktop_targets::DesktopSeatTarget::owned(path))
 }
 
 fn run_trash_operation<T>(operation: impl FnOnce() -> Result<T, String> + Send + 'static) -> Result<T, String>
@@ -816,7 +766,22 @@ pub fn trash_user_food(
 }
 
 pub fn cleanup_owned_seat_files(app: &AppHandle) -> Result<usize, String> {
+    let data = app.path().app_data_dir().map_err(|error| error.to_string())?;
+    if !owned_seat_manifest_has_entries(&data)? {
+        return Ok(0);
+    }
     FoodSafety::from_app(app)?.cleanup_owned_with(move_to_trash)
+}
+
+fn owned_seat_manifest_has_entries(data: &Path) -> Result<bool, String> {
+    let manifest = data.join("owned-seat-files.json");
+    match fs::read(manifest) {
+        Ok(bytes) => serde_json::from_slice::<Vec<OwnedSeat>>(&bytes)
+            .map(|entries| !entries.is_empty())
+            .map_err(|error| error.to_string()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(error) => Err(error.to_string()),
+    }
 }
 
 #[cfg(test)]
@@ -1159,6 +1124,14 @@ mod tests {
         fs::write(dirs.data.join("owned-seat-files.json"), "{").unwrap();
         let safety = dirs.safety();
         assert!(safety.owned.is_empty());
+    }
+
+    #[test]
+    fn empty_or_missing_ownership_manifest_skips_desktop_cleanup() {
+        let dirs = TestDirs::new();
+        assert!(!owned_seat_manifest_has_entries(&dirs.data).unwrap());
+        fs::write(dirs.data.join("owned-seat-files.json"), "[]").unwrap();
+        assert!(!owned_seat_manifest_has_entries(&dirs.data).unwrap());
     }
 
     #[test]

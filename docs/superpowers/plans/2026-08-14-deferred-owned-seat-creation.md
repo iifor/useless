@@ -27,11 +27,12 @@
 **Interfaces:**
 - Produces: `isPendingOwnedSeat(target: DesktopSeatTarget): boolean`
 - Produces: `materializeOwnedSeatTarget(target: DesktopSeatTarget): Promise<DesktopSeatTarget>`
+- Produces: `arriveThenMaterializeSeat(target, arrive, materialize): Promise<DesktopSeatTarget>`
 - Consumes: existing `find_seat_targets`, `create_owned_seat_file`, `moveWindowTo`, and `releaseSeatTarget`
 
 - [ ] **Step 1: Write the failing tests**
 
-Add tests proving that the 10% branch returns an uncreated pending target and that materialization invokes creation exactly once only when explicitly called:
+Add tests proving that the 10% branch returns an uncreated pending target, arrival precedes creation, and failed arrival performs no creation:
 
 ```ts
 test("defers owned file creation until the pending target is materialized", async () => {

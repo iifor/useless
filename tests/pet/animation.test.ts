@@ -10,7 +10,11 @@ import {
   normalizedContentScale,
   stripFrameRect,
 } from "../../src/pet/animation";
-import { ANIMATIONS, PET_POSES } from "../../src/pet/animations";
+import {
+  ANIMATIONS,
+  PET_POSES,
+  contentLongEdgeForPose,
+} from "../../src/pet/animations";
 
 describe("frame coordinates", () => {
   test("maps an atlas cell to its source rectangle", () => {
@@ -37,7 +41,7 @@ test("maps CSS pointer coordinates to canvas pixels", () => {
 });
 
 test("defines a usable animation for every pet pose", () => {
-  expect(PET_POSES).toHaveLength(9);
+  expect(Object.keys(ANIMATIONS)).toEqual([...PET_POSES]);
   for (const pose of PET_POSES) {
     const animation = ANIMATIONS[pose];
     expect(animation.source).toMatch(/\.(png|webp)$/);
@@ -99,6 +103,12 @@ test("uses one scale that normalizes the largest animation frame to 200 pixels",
   expect(normalizedContentScale([
     { minX: 1, minY: 1, maxX: 101, maxY: 151 },
   ], 180)).toBe(1.2);
+});
+
+test("uses a smaller default pet size and a prone visual correction", () => {
+  expect(contentLongEdgeForPose("idle-stand")).toBe(170);
+  expect(contentLongEdgeForPose("idle-sit")).toBe(170);
+  expect(contentLongEdgeForPose("idle-prone")).toBe(145);
 });
 
 test("crops an animation to the aligned alpha union plus eight pixels of padding", () => {

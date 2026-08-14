@@ -21,7 +21,17 @@ import { finishFood, type FoodFlow } from "./pet/foodFlow";
 import { pickFood, trashFood, type FoodPickerKind } from "./pet/foodPicker";
 import PetActionMenu from "./pet/PetActionMenu";
 import type { ActionMenuValue, ManualAction } from "./pet/actionMenu";
-import { findSeatTarget, releaseSeatTarget, type DesktopSeatTarget } from "./pet/desktopSeat";
+import {
+  arriveThenMaterializeSeat,
+  findSeatTarget,
+  isPendingOwnedSeat,
+  materializeOwnedSeatTarget,
+  refreshWindowSeat,
+  releaseSeatTarget,
+  seatTargetChanged,
+  shouldRenderSeatMarker,
+  type DesktopSeatTarget,
+} from "./pet/desktopSeat";
 import PetRenderer from "./pet/PetRenderer";
 import { SeatIcon } from "./pet/SeatIcon";
 import {
@@ -32,6 +42,7 @@ import {
   hideSeatTargetBubble,
   moveWindowTo,
   randomWindowDestination,
+  seatWindowDestination,
   setPetWindowLayout,
   showSeatTargetBubble,
   waitForPetWindowLayout,
@@ -126,19 +137,61 @@ export default function App() {
         setAction(PetAction.WALK_SLOW);
         await waitForPetWindowLayout();
         if (!isCurrent()) return;
-        const destination = target.screenPosition ?? await randomWindowDestination();
+        let destination = target.seatAnchor
+          ? await seatWindowDestination(target.seatAnchor)
+          : await randomWindowDestination();
         if (!isCurrent()) return;
-        if (!target.screenPosition) await showSeatTargetBubble(bubbleOwner, destination, target.kind);
+        if (shouldRenderSeatMarker(target)) {
+          await showSeatTargetBubble(bubbleOwner, destination, target.kind);
+        }
         if (!isCurrent()) return;
-        await moveWindowTo(destination, signal, (value) => {
-          if (isCurrent()) setDirection(value);
-        });
+        const wasPendingOwnedSeat = isPendingOwnedSeat(target);
+        target = await arriveThenMaterializeSeat(target, () =>
+          moveWindowTo(destination, signal, (value) => {
+            if (isCurrent()) setDirection(value);
+          }), materializeOwnedSeatTarget);
+        if (!isCurrent()) return;
+        if (wasPendingOwnedSeat) {
+          if (target.seatAnchor) {
+            destination = await seatWindowDestination(target.seatAnchor);
+            await moveWindowTo(destination, signal, (value) => {
+              if (isCurrent()) setDirection(value);
+            });
+          } else if (shouldRenderSeatMarker(target)) {
+            await showSeatTargetBubble(bubbleOwner, destination, target.kind);
+          }
+        }
+        if (!isCurrent()) return;
+        if (target.kind === "window") {
+          const refreshed = await refreshWindowSeat(target);
+          if (!refreshed?.seatAnchor) return;
+          if (seatTargetChanged(target, refreshed)) {
+            target = refreshed;
+            await moveWindowTo(
+              await seatWindowDestination(refreshed.seatAnchor),
+              signal,
+              (value) => { if (isCurrent()) setDirection(value); },
+            );
+          } else {
+            target = refreshed;
+          }
+        }
         if (!isCurrent()) return;
         await hideSeatTargetBubble(bubbleOwner);
         if (!isCurrent()) return;
         setSeat(target);
         setAction(PetAction.SEAT_ON_ITEM);
-        await delay(actionDurationMs(PetAction.SEAT_ON_ITEM), signal);
+        const seatedUntil = performance.now() + actionDurationMs(PetAction.SEAT_ON_ITEM);
+        while (performance.now() < seatedUntil) {
+          await delay(Math.min(1_000, seatedUntil - performance.now()), signal);
+          if (target.kind !== "window") continue;
+          const refreshed = await refreshWindowSeat(target);
+          if (!refreshed || seatTargetChanged(target, refreshed)) {
+            setAction(PetAction.IDLE_STAND);
+            return;
+          }
+          target = refreshed;
+        }
       } finally {
         if (isCurrent()) {
           await hideSeatTargetBubble(bubbleOwner).catch(() => undefined);
@@ -161,7 +214,14 @@ export default function App() {
           await seatSequence();
           if (isCurrent()) setAction(PetAction.IDLE_STAND);
         }
-        if (manual === PetAction.SEAT_ON_ITEM) setSeat({ id: "manual", name: "测试座位", kind: "virtual", appOwned: false });
+        if (manual === PetAction.SEAT_ON_ITEM) setSeat({
+          id: "manual",
+          name: "测试座位",
+          kind: "virtual",
+          focused: false,
+          appOwned: false,
+          virtualMarker: true,
+        });
         return;
       }
 
@@ -312,7 +372,7 @@ export default function App() {
   return (
     <main onPointerDown={() => { if (menuPoint) closeMenu(); }}>
       <div className="pet-stage">
-        {seat && <SeatIcon kind={seat.kind} />}
+        {shouldRenderSeatMarker(seat) && seat && <SeatIcon kind={seat.kind} />}
         <PetRenderer
           dragDisabled={windowMode === "interaction" || foodActive.current}
           onBodyContextMenu={openMenu}
