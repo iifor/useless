@@ -49,7 +49,46 @@ export async function findVisualStudioDeveloperCommand({
   throw new Error("未找到 Visual Studio 2022 Build Tools（需要 MSVC x64 构建工具）");
 }
 
-export async function resolveBuildArtifacts(root = projectRoot) {
+function installerMetadata(details) {
+  return {
+    size: details.size,
+    mtimeMs: details.mtimeMs,
+    ctimeMs: details.ctimeMs,
+    birthtimeMs: details.birthtimeMs,
+    ino: details.ino,
+  };
+}
+
+function installerChanged(previous, current) {
+  return !previous
+    || previous.size !== current.size
+    || previous.mtimeMs !== current.mtimeMs
+    || previous.ctimeMs !== current.ctimeMs
+    || previous.birthtimeMs !== current.birthtimeMs
+    || previous.ino !== current.ino;
+}
+
+export async function snapshotInstallerCandidates(root = projectRoot) {
+  const releaseRoot = join(root, "src-tauri", "target", WINDOWS_TARGET, "release");
+  const nsisDirectory = join(releaseRoot, "bundle", "nsis");
+  const installers = new Map();
+  try {
+    await Promise.all((await readdir(nsisDirectory))
+      .filter((name) => name.endsWith("-setup.exe"))
+      .map(async (name) => {
+        const installer = join(nsisDirectory, name);
+        try {
+          const details = await stat(installer);
+          if (details.isFile() && details.size > 0) {
+            installers.set(installer, installerMetadata(details));
+          }
+        } catch {}
+      }));
+  } catch {}
+  return installers;
+}
+
+export async function resolveBuildArtifacts(root = projectRoot, installersBeforeBuild) {
   const releaseRoot = join(root, "src-tauri", "target", WINDOWS_TARGET, "release");
   const application = join(releaseRoot, "black-shirt-companion.exe");
   try {
@@ -58,22 +97,17 @@ export async function resolveBuildArtifacts(root = projectRoot) {
     throw new Error(`未找到 Tauri 应用程序：${application}`);
   }
   const nsisDirectory = join(releaseRoot, "bundle", "nsis");
-  let installers = [];
-  try {
-    installers = (await Promise.all((await readdir(nsisDirectory))
-      .filter((name) => name.endsWith("-setup.exe"))
-      .map(async (name) => {
-        const installer = join(nsisDirectory, name);
-        try {
-          const details = await stat(installer);
-          return details.isFile() && details.size > 0 ? installer : undefined;
-        } catch {
-          return undefined;
-        }
-      })))
-      .filter(Boolean)
-      .sort();
-  } catch {}
+  const installerCandidates = await snapshotInstallerCandidates(root);
+  let installers = [...installerCandidates.keys()].sort();
+  if (installersBeforeBuild) {
+    installers = installers.filter((installer) => installerChanged(
+      installersBeforeBuild.get(installer),
+      installerCandidates.get(installer),
+    ));
+    if (installers.length > 1) {
+      throw new Error(`本次构建产生了多个 NSIS 安装包：${installers.join(", ")}`);
+    }
+  }
   if (!installers.length) throw new Error(`未找到 NSIS 安装包：${nsisDirectory}`);
   return { application, installer: installers.at(-1) };
 }
@@ -192,18 +226,23 @@ export async function runWindowsBuild({
   architecture = arch(),
   runCommand = spawnCommand,
   findVsDev = findVisualStudioDeveloperCommand,
+  snapshotInstallers = snapshotInstallerCandidates,
   resolveArtifacts = resolveBuildArtifacts,
   publish = publishArtifacts,
 } = {}) {
   if (platform !== "win32") throw new Error("pnpm build:windows 仅支持 Windows");
   if (architecture !== "x64") throw new Error(`仅支持 Windows x64，当前架构：${architecture}`);
+  const installersBeforeBuild = await snapshotInstallers(root);
   await runCommand("rustc", [`+${RUST_TOOLCHAIN}`, "--version"], { cwd: root });
   const vsDevCommand = await findVsDev();
   await runCommand("cmd.exe", ["/d", "/s", "/c", buildDeveloperCommand(vsDevCommand)], {
     cwd: root,
     windowsVerbatimArguments: true,
   });
-  return publish({ ...(await resolveArtifacts(root)), releaseDirectory: join(root, "release") });
+  return publish({
+    ...(await resolveArtifacts(root, installersBeforeBuild)),
+    releaseDirectory: join(root, "release"),
+  });
 }
 
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {

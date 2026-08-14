@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { mkdir, mkdtemp, readFile, readdir, rename as renameFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rename as renameFile, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
@@ -126,6 +126,63 @@ describe("Windows local build", () => {
         releaseDirectory: join(root, "release"),
       }],
     ]);
+  });
+
+  test("publishes only the installer changed by the current build when stale versions exist", async () => {
+    const root = await temporaryRoot();
+    const release = join(root, "src-tauri", "target", WINDOWS_TARGET, "release");
+    const nsis = join(release, "bundle", "nsis");
+    const currentInstaller = join(nsis, "black-shirt-companion_1.0.0_x64-setup.exe");
+    const staleInstaller = join(nsis, "black-shirt-companion_9.0.0_x64-setup.exe");
+    await mkdir(nsis, { recursive: true });
+    await writeFile(join(release, "black-shirt-companion.exe"), "portable");
+    await writeFile(currentInstaller, "old current installer");
+    await utimes(currentInstaller, 1, 1);
+    await writeFile(staleInstaller, "stale future installer");
+    let publishedInstaller;
+
+    await runWindowsBuild({
+      root,
+      platform: "win32",
+      architecture: "x64",
+      runCommand: async (command) => {
+        if (command === "cmd.exe") {
+          await writeFile(currentInstaller, "new current installer");
+          await utimes(currentInstaller, 2, 2);
+        }
+        return "";
+      },
+      findVsDev: async () => "C:\\VS\\VsDevCmd.bat",
+      publish: async ({ installer }) => {
+        publishedInstaller = installer;
+        return [];
+      },
+    });
+
+    expect(publishedInstaller).toBe(currentInstaller);
+  });
+
+  test("rejects a build that creates or modifies more than one installer", async () => {
+    const root = await temporaryRoot();
+    const release = join(root, "src-tauri", "target", WINDOWS_TARGET, "release");
+    const nsis = join(release, "bundle", "nsis");
+    await mkdir(nsis, { recursive: true });
+    await writeFile(join(release, "black-shirt-companion.exe"), "portable");
+
+    await expect(runWindowsBuild({
+      root,
+      platform: "win32",
+      architecture: "x64",
+      runCommand: async (command) => {
+        if (command === "cmd.exe") {
+          await writeFile(join(nsis, "black-shirt-companion_1.0.0_x64-setup.exe"), "installer one");
+          await writeFile(join(nsis, "black-shirt-companion_2.0.0_x64-setup.exe"), "installer two");
+        }
+        return "";
+      },
+      findVsDev: async () => "C:\\VS\\VsDevCmd.bat",
+      publish: async () => [],
+    })).rejects.toThrow("本次构建产生了多个 NSIS 安装包");
   });
 
   windowsTest("executes a developer batch path containing spaces through cmd.exe", async () => {
