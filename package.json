@@ -1,14 +1,17 @@
 {
   "name": "black-shirt-companion-desktop",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "scripts": {
     "dev": "vite --port 1420",
     "build": "tsc -b && vite build",
     "test": "vitest run",
     "tauri": "tauri",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build",
+    "dmg": "tauri build --bundles dmg --no-sign",
+    "exe": "tauri build --target x86_64-pc-windows-msvc --bundles nsis --no-sign",
+    "release": "node scripts/release.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",

@@ -3,3 +3,9 @@ dist
 .DS_Store
 src-tauri/target
 docs
+/.pnpm-store/
+/release/
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
+src-tauri/tauri.release.local.conf.json

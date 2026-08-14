@@ -1,11 +1,14 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod app_updates;
 mod food_safety;
 mod instance_position;
 
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .manage(app_updates::UpdateManager::default())
         .setup(|app| {
             if let Err(error) = instance_position::position_main_window(app.handle()) {
                 eprintln!("UNO 多实例窗口定位失败: {error}");
@@ -21,6 +24,9 @@ fn main() {
             food_safety::trash_owned_seat_file,
             food_safety::inspect_user_food,
             food_safety::trash_user_food,
+            app_updates::prepare_update,
+            app_updates::install_pending_update,
+            app_updates::system_idle_seconds,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run black shirt companion");

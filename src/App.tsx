@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 
 import {
   PetAction,
@@ -42,6 +43,11 @@ import {
   type Point,
   type Size,
 } from "./pet/windowMotion";
+import {
+  runAutomaticUpdater,
+  type UpdateBackend,
+  type UpdateMetadata,
+} from "./update/updateScheduler";
 
 const waitForFood = (milliseconds: number) =>
   new Promise<void>((resolve) => window.setTimeout(resolve, milliseconds));
@@ -63,6 +69,34 @@ export default function App() {
   const compactSize = useRef<Size>({ width: 216, height: 216 });
   const windowModeRef = useRef<PetWindowMode>("compact");
   const menuRequest = useRef(0);
+  const menuOpen = useRef(false);
+  const dragging = useRef(false);
+
+  useEffect(() => {
+    if (import.meta.env.DEV || !("__TAURI_INTERNALS__" in window)) return;
+    const controller = new AbortController();
+    const backend: UpdateBackend = {
+      prepare: () => invoke<UpdateMetadata | null>("prepare_update"),
+      idleSeconds: () => invoke<number>("system_idle_seconds"),
+      install: () => invoke("install_pending_update"),
+    };
+    void runAutomaticUpdater({
+      backend,
+      isBusy: () => menuOpen.current || dragging.current || foodActive.current,
+      onBeforeInstall: () => {
+        active.current?.abort();
+        void hideSeatTargetBubble();
+        setSeat(null);
+        setAction(PetAction.IDLE_STAND);
+      },
+      onError: (error) => console.error("自动更新失败，将在下个周期重试", error),
+      signal: controller.signal,
+      sleep: delay,
+    }).catch((error) => {
+      if (!controller.signal.aborted) console.error("自动更新调度失败", error);
+    });
+    return () => controller.abort();
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -175,6 +209,7 @@ export default function App() {
   const closeMenu = () => {
     if (menuPoint === null && windowModeRef.current !== "interaction") return;
     menuRequest.current += 1;
+    menuOpen.current = false;
     setMenuPoint(null);
     void applyWindowMode("compact").then(() => {
       if (!foodActive.current) setRevision((value) => value + 1);
@@ -183,6 +218,7 @@ export default function App() {
 
   const openMenu = (point: Point) => {
     if (foodActive.current) return;
+    menuOpen.current = true;
     const request = ++menuRequest.current;
     dragResume.current = dragResumeAction(automatic, action, manual);
     active.current?.abort();
@@ -196,6 +232,7 @@ export default function App() {
   const selectMode = (value: ActionMenuValue) => {
     if (foodActive.current) return;
     menuRequest.current += 1;
+    menuOpen.current = false;
     setMenuPoint(null);
     active.current?.abort();
     void hideSeatTargetBubble();
@@ -240,6 +277,7 @@ export default function App() {
   const chooseFood = async (kind: FoodPickerKind): Promise<void> => {
     if (!beginFoodActivity(foodActive)) return Promise.resolve();
     menuRequest.current += 1;
+    menuOpen.current = false;
     dragResume.current = null;
     setMenuPoint(null);
     active.current?.abort();
@@ -255,6 +293,7 @@ export default function App() {
 
   const dragStart = () => {
     if (!shouldResumeAfterDrag(foodActive.current)) return;
+    dragging.current = true;
     dragResume.current = dragResumeAction(automatic, action, manual);
     active.current?.abort();
     void hideSeatTargetBubble();
@@ -265,6 +304,7 @@ export default function App() {
     } catch (error) {
       console.error("拖动后窗口归位失败", error);
     } finally {
+      dragging.current = false;
       if (shouldResumeAfterDrag(foodActive.current)) setRevision((value) => value + 1);
     }
   };
