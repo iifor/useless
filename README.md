@@ -32,3 +32,16 @@ git push --atomic origin master vX.Y.Z
 ```
 
 `0.2.0` 是首个包含 Updater 的基线版本，需要用户手工安装一次；从 `0.2.1` 开始，Release 版会在启动 15 秒后检查更新，之后每 6 小时检查。更新下载并验签后，系统空闲 5 分钟且宠物没有交互时自动安装并重启。Debug 构建不检查更新。
+## Windows 本地构建
+
+前置条件：Node.js 22、pnpm 11、Rust `1.86.0-x86_64-pc-windows-msvc`，以及安装了“使用 C++ 的桌面开发”的 Visual Studio 2022 Build Tools。
+
+```powershell
+pnpm install --frozen-lockfile
+pnpm build:windows
+```
+
+构建完成后生成：
+
+- `release/UNO.exe`：便携版。
+- `release/UNO-Setup.exe`：未签名安装包，Windows 可能显示安全提醒。

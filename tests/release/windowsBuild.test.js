@@ -212,3 +212,11 @@ describe("Windows local build", () => {
     expect(await readFile(join(release, "UNO-Setup.exe"), "utf8")).toBe("old installer");
   });
 });
+
+test("package.json exposes the Windows build command", async () => {
+  const packageJson = JSON.parse(await readFile(
+    new URL("../../package.json", import.meta.url),
+    "utf8",
+  ));
+  expect(packageJson.scripts["build:windows"]).toBe("node scripts/build-windows.mjs");
+});
