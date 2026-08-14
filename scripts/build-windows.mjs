@@ -46,7 +46,7 @@ export async function findVisualStudioDeveloperCommand({
       } catch {}
     }
   }
-  throw new Error("鏈壘鍒?Visual Studio 2022 Build Tools锛堥渶瑕?MSVC x64 鏋勫缓宸ュ叿锛?");
+  throw new Error("未找到 Visual Studio 2022 Build Tools（需要 MSVC x64 构建工具）");
 }
 
 export async function resolveBuildArtifacts(root = projectRoot) {
@@ -55,40 +55,50 @@ export async function resolveBuildArtifacts(root = projectRoot) {
   try {
     if ((await stat(application)).size <= 0) throw new Error();
   } catch {
-    throw new Error(`鏈壘鍒?Tauri 搴旂敤绋嬪簭锛?${application}`);
+    throw new Error(`未找到 Tauri 应用程序：${application}`);
   }
   const nsisDirectory = join(releaseRoot, "bundle", "nsis");
   let installers = [];
   try {
-    installers = (await readdir(nsisDirectory))
+    installers = (await Promise.all((await readdir(nsisDirectory))
       .filter((name) => name.endsWith("-setup.exe"))
+      .map(async (name) => {
+        const installer = join(nsisDirectory, name);
+        try {
+          const details = await stat(installer);
+          return details.isFile() && details.size > 0 ? installer : undefined;
+        } catch {
+          return undefined;
+        }
+      })))
+      .filter(Boolean)
       .sort();
   } catch {}
-  if (!installers.length) throw new Error(`鏈壘鍒?NSIS 瀹夎鍖咃細${nsisDirectory}`);
-  return { application, installer: join(nsisDirectory, installers.at(-1)) };
+  if (!installers.length) throw new Error(`未找到 NSIS 安装包：${nsisDirectory}`);
+  return { application, installer: installers.at(-1) };
 }
 
 let publicationCount = 0;
 
-async function requireNonEmptyFile(path) {
-  const details = await stat(path);
-  if (details.size <= 0) throw new Error(`构建产物为空：${path}`);
+async function requireNonEmptyFile(path, fileSystem) {
+  const details = await fileSystem.stat(path);
+  if (!details.isFile() || details.size <= 0) throw new Error(`构建产物为空：${path}`);
   return details;
 }
 
-async function moveExistingFile(source, destination) {
+async function moveExistingFile(source, destination, fileSystem) {
   try {
-    await stat(source);
+    await fileSystem.stat(source);
   } catch (error) {
     if (error?.code === "ENOENT") return false;
     throw error;
   }
-  await rename(source, destination);
+  await fileSystem.rename(source, destination);
   return true;
 }
 
-async function sha256(path) {
-  const handle = await open(path);
+async function sha256(path, fileSystem) {
+  const handle = await fileSystem.open(path);
   const hash = createHash("sha256");
   try {
     for await (const chunk of handle.createReadStream({ autoClose: false })) {
@@ -100,17 +110,18 @@ async function sha256(path) {
   return hash.digest("hex");
 }
 
-async function restoreBackups(artifacts) {
+async function restoreBackups(artifacts, fileSystem) {
   await Promise.all(artifacts
     .filter(({ published }) => published)
-    .map(({ destination }) => rm(destination, { force: true })));
+    .map(({ destination }) => fileSystem.rm(destination, { force: true })));
   await Promise.all(artifacts
     .filter(({ backedUp }) => backedUp)
-    .map(({ backup, destination }) => rename(backup, destination)));
+    .map(({ backup, destination }) => fileSystem.rename(backup, destination)));
 }
 
-export async function publishArtifacts({ application, installer, releaseDirectory }) {
-  await mkdir(releaseDirectory, { recursive: true });
+export async function publishArtifacts({ application, installer, releaseDirectory, fileSystem: overrides = {} }) {
+  const fileSystem = { copyFile, mkdir, open, rename, rm, stat, ...overrides };
+  await fileSystem.mkdir(releaseDirectory, { recursive: true });
   const publicationId = `${process.pid}-${Date.now()}-${publicationCount++}`;
   const artifacts = [
     { source: application, name: "UNO.exe" },
@@ -124,34 +135,39 @@ export async function publishArtifacts({ application, installer, releaseDirector
     published: false,
   }));
 
+  let cleanupBackups = false;
   try {
-    await Promise.all(artifacts.map(({ source, staged }) => copyFile(source, staged)));
-    await Promise.all(artifacts.map(({ staged }) => requireNonEmptyFile(staged)));
+    await Promise.all(artifacts.map(({ source, staged }) => fileSystem.copyFile(source, staged)));
+    await Promise.all(artifacts.map(({ staged }) => requireNonEmptyFile(staged, fileSystem)));
 
     for (const artifact of artifacts) {
-      artifact.backedUp = await moveExistingFile(artifact.destination, artifact.backup);
+      artifact.backedUp = await moveExistingFile(artifact.destination, artifact.backup, fileSystem);
     }
     for (const artifact of artifacts) {
-      await rename(artifact.staged, artifact.destination);
+      await fileSystem.rename(artifact.staged, artifact.destination);
       artifact.published = true;
     }
 
-    return Promise.all(artifacts.map(async ({ name, destination }) => {
-      const { size: bytes } = await requireNonEmptyFile(destination);
-      return { name, path: destination, bytes, sha256: await sha256(destination) };
+    const result = await Promise.all(artifacts.map(async ({ name, destination }) => {
+      const { size: bytes } = await requireNonEmptyFile(destination, fileSystem);
+      return { name, path: destination, bytes, sha256: await sha256(destination, fileSystem) };
     }));
+    cleanupBackups = true;
+    return result;
   } catch (error) {
     try {
-      await restoreBackups(artifacts);
+      await restoreBackups(artifacts, fileSystem);
+      cleanupBackups = true;
     } catch (restoreError) {
       error.message = `${error.message}; 恢复旧产物失败：${restoreError.message}`;
     }
     throw error;
   } finally {
-    await Promise.all(artifacts.flatMap(({ staged, backup }) => [
-      rm(staged, { force: true }),
-      rm(backup, { force: true }),
-    ]));
+    const temporaryFiles = artifacts.map(({ staged }) => fileSystem.rm(staged, { force: true }));
+    if (cleanupBackups) {
+      temporaryFiles.push(...artifacts.map(({ backup }) => fileSystem.rm(backup, { force: true })));
+    }
+    await Promise.all(temporaryFiles);
   }
 }
 
@@ -179,8 +195,8 @@ export async function runWindowsBuild({
   resolveArtifacts = resolveBuildArtifacts,
   publish = publishArtifacts,
 } = {}) {
-  if (platform !== "win32") throw new Error("pnpm build:windows 浠呮敮鎸?Windows");
-  if (architecture !== "x64") throw new Error(`浠呮敮鎸?Windows x64锛屽綋鍓嶆灦鏋勶細${architecture}`);
+  if (platform !== "win32") throw new Error("pnpm build:windows 仅支持 Windows");
+  if (architecture !== "x64") throw new Error(`仅支持 Windows x64，当前架构：${architecture}`);
   await runCommand("rustc", [`+${RUST_TOOLCHAIN}`, "--version"], { cwd: root });
   const vsDevCommand = await findVsDev();
   await runCommand("cmd.exe", ["/d", "/s", "/c", buildDeveloperCommand(vsDevCommand)], {
@@ -199,7 +215,7 @@ if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) 
         || (error?.message?.includes(RUST_TOOLCHAIN)
           && /toolchain.*(?:not installed|is not installed)/i.test(error.message));
       const message = missingRustToolchain
-        ? "缂哄皯 Rust 1.86 MSVC锛岃杩愯 rustup toolchain install 1.86.0-x86_64-pc-windows-msvc --profile minimal"
+        ? "缺少 Rust 1.86 MSVC，请运行 rustup toolchain install 1.86.0-x86_64-pc-windows-msvc --profile minimal"
         : error.message;
       console.error(`Windows 构建失败：${message}`);
       process.exitCode = 1;
