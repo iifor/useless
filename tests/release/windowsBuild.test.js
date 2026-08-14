@@ -1,6 +1,7 @@
+import { spawn } from "node:child_process";
 import { mkdir, mkdtemp, readFile, readdir, rename as renameFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
 
 import {
@@ -14,6 +15,7 @@ import {
 } from "../../scripts/build-windows.mjs";
 
 const temporaryDirectories = [];
+const windowsTest = process.platform === "win32" ? test : test.skip;
 
 afterEach(async () => {
   const { rm } = await import("node:fs/promises");
@@ -25,6 +27,21 @@ async function temporaryRoot() {
   const root = await mkdtemp(join(tmpdir(), "uno-windows-build-"));
   temporaryDirectories.push(root);
   return root;
+}
+
+function runProcess(command, args, options) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, options);
+    let output = "";
+    let errorOutput = "";
+    child.stdout.on("data", (chunk) => { output += chunk; });
+    child.stderr.on("data", (chunk) => { errorOutput += chunk; });
+    child.on("error", reject);
+    child.on("close", (code) => {
+      if (code === 0) resolve(output);
+      else reject(new Error(`${command} exited with code ${code}: ${errorOutput || output}`));
+    });
+  });
 }
 
 describe("Windows local build", () => {
@@ -98,7 +115,10 @@ describe("Windows local build", () => {
     expect(calls).toEqual([
       ["runCommand", "rustc", ["+1.86.0-x86_64-pc-windows-msvc", "--version"], { cwd: root }],
       ["findVsDev"],
-      ["runCommand", "cmd.exe", ["/d", "/s", "/c", 'call "C:\\VS\\VsDevCmd.bat" -no_logo -arch=x64 && set "RUSTUP_TOOLCHAIN=1.86.0-x86_64-pc-windows-msvc" && pnpm exec tauri build --target x86_64-pc-windows-msvc --bundles nsis --no-sign'], { cwd: root }],
+      ["runCommand", "cmd.exe", ["/d", "/s", "/c", 'call "C:\\VS\\VsDevCmd.bat" -no_logo -arch=x64 && set "RUSTUP_TOOLCHAIN=1.86.0-x86_64-pc-windows-msvc" && pnpm exec tauri build --target x86_64-pc-windows-msvc --bundles nsis --no-sign'], {
+        cwd: root,
+        windowsVerbatimArguments: true,
+      }],
       ["resolveArtifacts", root],
       ["publish", {
         application: "/built/app.exe",
@@ -106,6 +126,37 @@ describe("Windows local build", () => {
         releaseDirectory: join(root, "release"),
       }],
     ]);
+  });
+
+  windowsTest("executes a developer batch path containing spaces through cmd.exe", async () => {
+    const root = await temporaryRoot();
+    const toolsDirectory = join(root, "Visual Studio Tools");
+    const binDirectory = join(root, "fake bin");
+    await mkdir(toolsDirectory, { recursive: true });
+    await mkdir(binDirectory, { recursive: true });
+    const developerCommand = join(toolsDirectory, "VsDevCmd.bat");
+    await writeFile(developerCommand, "@echo off\r\nexit /b 0\r\n");
+    await writeFile(join(binDirectory, "pnpm.cmd"), "@echo off\r\nexit /b 0\r\n");
+    const environment = { ...process.env };
+    const pathKey = Object.keys(environment).find((key) => key.toLowerCase() === "path") ?? "Path";
+    environment[pathKey] = `${binDirectory}${delimiter}${environment[pathKey] ?? ""}`;
+    const published = [{ name: "UNO.exe" }];
+
+    await expect(runWindowsBuild({
+      root,
+      platform: "win32",
+      architecture: "x64",
+      runCommand: async (command, args, options) => {
+        if (command === "rustc") return "";
+        return runProcess(command, args, { ...options, env: environment });
+      },
+      findVsDev: async () => developerCommand,
+      resolveArtifacts: async () => ({
+        application: join(root, "built-app.exe"),
+        installer: join(root, "built-setup.exe"),
+      }),
+      publish: async () => published,
+    })).resolves.toBe(published);
   });
 
   test("publishes both stable artifacts together", async () => {

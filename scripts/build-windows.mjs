@@ -201,6 +201,7 @@ export async function runWindowsBuild({
   const vsDevCommand = await findVsDev();
   await runCommand("cmd.exe", ["/d", "/s", "/c", buildDeveloperCommand(vsDevCommand)], {
     cwd: root,
+    windowsVerbatimArguments: true,
   });
   return publish({ ...(await resolveArtifacts(root)), releaseDirectory: join(root, "release") });
 }
