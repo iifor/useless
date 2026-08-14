@@ -1,6 +1,6 @@
 [package]
 name = "black-shirt-companion"
-version = "0.1.1"
+version = "0.1.2"
 description = "安静慵懒的黑衣桌面伙伴"
 authors = ["Black Shirt Companion"]
 edition = "2021"
