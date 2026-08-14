@@ -65,26 +65,45 @@ function installerChanged(previous, current) {
     || previous.mtimeMs !== current.mtimeMs
     || previous.ctimeMs !== current.ctimeMs
     || previous.birthtimeMs !== current.birthtimeMs
-    || previous.ino !== current.ino;
+    || previous.ino !== current.ino
+    || previous.sha256 !== current.sha256;
 }
 
-export async function snapshotInstallerCandidates(root = projectRoot) {
+function isMissingFile(error) {
+  return error?.code === "ENOENT";
+}
+
+export async function snapshotInstallerCandidates(
+  root = projectRoot,
+  { fileSystem: overrides = {} } = {},
+) {
   const releaseRoot = join(root, "src-tauri", "target", WINDOWS_TARGET, "release");
   const nsisDirectory = join(releaseRoot, "bundle", "nsis");
+  const fileSystem = { open, readdir, stat, ...overrides };
   const installers = new Map();
+  let names;
   try {
-    await Promise.all((await readdir(nsisDirectory))
-      .filter((name) => name.endsWith("-setup.exe"))
-      .map(async (name) => {
-        const installer = join(nsisDirectory, name);
-        try {
-          const details = await stat(installer);
-          if (details.isFile() && details.size > 0) {
-            installers.set(installer, installerMetadata(details));
-          }
-        } catch {}
-      }));
-  } catch {}
+    names = await fileSystem.readdir(nsisDirectory);
+  } catch (error) {
+    if (isMissingFile(error)) return installers;
+    throw error;
+  }
+  await Promise.all(names
+    .filter((name) => name.endsWith("-setup.exe"))
+    .map(async (name) => {
+      const installer = join(nsisDirectory, name);
+      try {
+        const details = await fileSystem.stat(installer);
+        if (details.isFile() && details.size > 0) {
+          installers.set(installer, {
+            ...installerMetadata(details),
+            sha256: await sha256(installer, fileSystem),
+          });
+        }
+      } catch (error) {
+        if (!isMissingFile(error)) throw error;
+      }
+    }));
   return installers;
 }
 
@@ -106,6 +125,9 @@ export async function resolveBuildArtifacts(root = projectRoot, installersBefore
     ));
     if (installers.length > 1) {
       throw new Error(`本次构建产生了多个 NSIS 安装包：${installers.join(", ")}`);
+    }
+    if (!installers.length) {
+      throw new Error(`本次构建未产生新的或变更的 NSIS 安装包：${nsisDirectory}`);
     }
   }
   if (!installers.length) throw new Error(`未找到 NSIS 安装包：${nsisDirectory}`);

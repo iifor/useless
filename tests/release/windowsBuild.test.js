@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
-import { mkdir, mkdtemp, readFile, readdir, rename as renameFile, utimes, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { mkdir, mkdtemp, readFile, readdir, rename as renameFile, stat, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
@@ -12,6 +13,7 @@ import {
   publishArtifacts,
   resolveBuildArtifacts,
   runWindowsBuild,
+  snapshotInstallerCandidates,
 } from "../../scripts/build-windows.mjs";
 
 const temporaryDirectories = [];
@@ -162,12 +164,108 @@ describe("Windows local build", () => {
     expect(publishedInstaller).toBe(currentInstaller);
   });
 
+  test("detects a same-path same-size rewrite even when all file metadata is unchanged", async () => {
+    const root = await temporaryRoot();
+    const release = join(root, "src-tauri", "target", WINDOWS_TARGET, "release");
+    const nsis = join(release, "bundle", "nsis");
+    const application = join(release, "black-shirt-companion.exe");
+    const installer = join(nsis, "black-shirt-companion_1.0.0_x64-setup.exe");
+    await mkdir(nsis, { recursive: true });
+    await writeFile(application, "portable");
+    await writeFile(installer, "WXYZ");
+    const details = await stat(installer);
+    const installersBeforeBuild = new Map([[installer, {
+      size: details.size,
+      mtimeMs: details.mtimeMs,
+      ctimeMs: details.ctimeMs,
+      birthtimeMs: details.birthtimeMs,
+      ino: details.ino,
+      sha256: createHash("sha256").update("ABCD").digest("hex"),
+    }]]);
+
+    await expect(resolveBuildArtifacts(root, installersBeforeBuild)).resolves.toEqual({
+      application,
+      installer,
+    });
+  });
+
+  test("aborts before running the build when the installer directory snapshot is denied", async () => {
+    const root = await temporaryRoot();
+    const denied = Object.assign(new Error("snapshot directory denied"), { code: "EACCES" });
+    let commandRuns = 0;
+    let published = false;
+
+    await expect(runWindowsBuild({
+      root,
+      platform: "win32",
+      architecture: "x64",
+      snapshotInstallers: (path) => snapshotInstallerCandidates(path, {
+        fileSystem: { readdir: async () => { throw denied; } },
+      }),
+      runCommand: async () => { commandRuns += 1; return ""; },
+      findVsDev: async () => "C:\\VS\\VsDevCmd.bat",
+      publish: async () => { published = true; return []; },
+    })).rejects.toThrow("snapshot directory denied");
+
+    expect(commandRuns).toBe(0);
+    expect(published).toBe(false);
+  });
+
+  test("propagates a candidate stat error instead of treating it as a missing installer", async () => {
+    const root = await temporaryRoot();
+    const denied = Object.assign(new Error("snapshot file denied"), { code: "EACCES" });
+
+    await expect(snapshotInstallerCandidates(root, {
+      fileSystem: {
+        readdir: async () => ["black-shirt-companion_1.0.0_x64-setup.exe"],
+        stat: async () => { throw denied; },
+      },
+    })).rejects.toThrow("snapshot file denied");
+  });
+
+  test("propagates a candidate hash read error instead of ignoring the installer", async () => {
+    const root = await temporaryRoot();
+    const denied = Object.assign(new Error("snapshot hash denied"), { code: "EACCES" });
+
+    await expect(snapshotInstallerCandidates(root, {
+      fileSystem: {
+        readdir: async () => ["black-shirt-companion_1.0.0_x64-setup.exe"],
+        stat: async () => ({
+          isFile: () => true,
+          size: 4,
+          mtimeMs: 1,
+          ctimeMs: 1,
+          birthtimeMs: 1,
+          ino: 1,
+        }),
+        open: async () => { throw denied; },
+      },
+    })).rejects.toThrow("snapshot hash denied");
+  });
+
+  test("rejects a build resolution when no installer was created or changed", async () => {
+    const root = await temporaryRoot();
+    const release = join(root, "src-tauri", "target", WINDOWS_TARGET, "release");
+    const nsis = join(release, "bundle", "nsis");
+    await mkdir(nsis, { recursive: true });
+    await writeFile(join(release, "black-shirt-companion.exe"), "portable");
+    await writeFile(join(nsis, "black-shirt-companion_1.0.0_x64-setup.exe"), "unchanged installer");
+    const installersBeforeBuild = await snapshotInstallerCandidates(root);
+
+    await expect(resolveBuildArtifacts(root, installersBeforeBuild))
+      .rejects.toThrow("本次构建未产生新的或变更的 NSIS 安装包");
+  });
+
   test("rejects a build that creates or modifies more than one installer", async () => {
     const root = await temporaryRoot();
     const release = join(root, "src-tauri", "target", WINDOWS_TARGET, "release");
     const nsis = join(release, "bundle", "nsis");
     await mkdir(nsis, { recursive: true });
     await writeFile(join(release, "black-shirt-companion.exe"), "portable");
+    const firstInstaller = join(nsis, "black-shirt-companion_1.0.0_x64-setup.exe");
+    const secondInstaller = join(nsis, "black-shirt-companion_2.0.0_x64-setup.exe");
+    await writeFile(firstInstaller, "old installer one");
+    await writeFile(secondInstaller, "old installer two");
 
     await expect(runWindowsBuild({
       root,
@@ -175,8 +273,8 @@ describe("Windows local build", () => {
       architecture: "x64",
       runCommand: async (command) => {
         if (command === "cmd.exe") {
-          await writeFile(join(nsis, "black-shirt-companion_1.0.0_x64-setup.exe"), "installer one");
-          await writeFile(join(nsis, "black-shirt-companion_2.0.0_x64-setup.exe"), "installer two");
+          await writeFile(firstInstaller, "new installer one");
+          await writeFile(secondInstaller, "new installer two");
         }
         return "";
       },
