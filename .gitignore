@@ -4,6 +4,7 @@ dist
 src-tauri/target
 docs
 /.pnpm-store/
+/.worktrees/
 /release/
 *.tsbuildinfo
 vite.config.js
