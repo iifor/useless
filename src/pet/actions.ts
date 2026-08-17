@@ -1,8 +1,6 @@
 export enum PetAction {
   IDLE_STAND = "IDLE_STAND",
   IDLE_SIT = "IDLE_SIT",
-  IDLE_PRONE = "IDLE_PRONE",
-  IDLE_LIE = "IDLE_LIE",
   WALK_SLOW = "WALK_SLOW",
   SEARCH_SEAT = "SEARCH_SEAT",
   SEARCH_CURRENT_WINDOW = "SEARCH_CURRENT_WINDOW",
@@ -23,8 +21,6 @@ export interface ActionSelection {
 const REGULAR_ACTIONS = [
   PetAction.IDLE_STAND,
   PetAction.IDLE_SIT,
-  PetAction.IDLE_PRONE,
-  PetAction.IDLE_LIE,
   PetAction.WALK_SLOW,
 ] as const;
 

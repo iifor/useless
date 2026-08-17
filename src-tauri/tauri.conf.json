@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "UNO",
-  "version": "0.1.2",
-  "identifier": "com.blackshirt.companion",
+  "productName": "UNO PangYu",
+  "version": "0.1.0",
+  "identifier": "com.iifor.uno-pangyu",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",
@@ -14,7 +14,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "UNO",
+        "title": "UNO PangYu",
         "width": 280,
         "height": 320,
         "resizable": false,
@@ -29,7 +29,7 @@
       },
       {
         "label": "seat-target",
-        "title": "宠物座位目标",
+        "title": "PangYu 座位目标",
         "url": "index.html?seat-target=1",
         "width": 84,
         "height": 84,
@@ -57,11 +57,5 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
-  },
-  "plugins": {
-    "updater": {
-      "endpoints": [],
-      "pubkey": ""
-    }
   }
 }

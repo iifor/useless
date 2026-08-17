@@ -29,7 +29,7 @@ import { ANIMATIONS, poseForAction } from "../../src/pet/animations";
 describe("action scheduling", () => {
   test("keeps stationary actions between 30 seconds and 5 minutes", () => {
     expect(actionDurationMs(PetAction.IDLE_SIT, () => 0)).toBe(30_000);
-    expect(actionDurationMs(PetAction.IDLE_LIE, () => 0.999)).toBeLessThanOrEqual(300_000);
+    expect(actionDurationMs(PetAction.IDLE_STAND, () => 0.999)).toBeLessThanOrEqual(300_000);
   });
 
   test("plays the seat-search animation for two to four seconds", () => {
@@ -65,18 +65,18 @@ describe("action scheduling", () => {
   });
 
   test("manual selection pauses scheduling and automatic mode resumes standing", () => {
-    expect(manualAction(PetAction.IDLE_PRONE)).toEqual({ auto: false, action: PetAction.IDLE_PRONE });
+    expect(manualAction(PetAction.IDLE_SIT)).toEqual({ auto: false, action: PetAction.IDLE_SIT });
     expect(resumeAutomatic()).toEqual({ auto: true, action: PetAction.IDLE_STAND });
   });
 
   test("keeps the visible automatic action after dragging", () => {
-    expect(dragResumeAction(true, PetAction.IDLE_PRONE, PetAction.IDLE_STAND))
-      .toBe(PetAction.IDLE_PRONE);
+    expect(dragResumeAction(true, PetAction.IDLE_SIT, PetAction.IDLE_STAND))
+      .toBe(PetAction.IDLE_SIT);
   });
 
   test("keeps the selected manual action after dragging", () => {
-    expect(dragResumeAction(false, PetAction.WALK_SLOW, PetAction.IDLE_LIE))
-      .toBe(PetAction.IDLE_LIE);
+    expect(dragResumeAction(false, PetAction.WALK_SLOW, PetAction.IDLE_SIT))
+      .toBe(PetAction.IDLE_SIT);
   });
 
   test("does not let a drag continuation restart scheduling while the picker is pending", () => {
@@ -85,8 +85,8 @@ describe("action scheduling", () => {
   });
 
   test("automatic food completion resumes from standing", () => {
-    expect(foodResumeAction(true, PetAction.IDLE_LIE)).toBe(PetAction.IDLE_STAND);
-    expect(foodResumeAction(false, PetAction.IDLE_LIE)).toBe(PetAction.IDLE_LIE);
+    expect(foodResumeAction(true, PetAction.IDLE_SIT)).toBe(PetAction.IDLE_STAND);
+    expect(foodResumeAction(false, PetAction.IDLE_SIT)).toBe(PetAction.IDLE_SIT);
   });
 
   test("clears the seat after an automatic seated action completes", () => {
@@ -103,6 +103,12 @@ describe("action scheduling", () => {
         expect(poseForAction(action, direction)).toBeTruthy();
       }
     }
+  });
+
+  test("does not expose prone, lying, or sleeping actions", () => {
+    expect(PetAction).not.toHaveProperty("IDLE_PRONE");
+    expect(PetAction).not.toHaveProperty("IDLE_LIE");
+    expect(PetAction).not.toHaveProperty("SLEEP");
   });
 
   test("maps each walking direction to its own pose", () => {

@@ -3,9 +3,6 @@ import { PetAction, type Direction } from "./actions";
 export type PetPose =
   | "idle-stand"
   | "idle-sit"
-  | "idle-prone"
-  | "idle-lie"
-  | "sleep-side"
   | "walk-slow-left"
   | "walk-slow-right"
   | "walk-slow-up"
@@ -30,9 +27,6 @@ export interface AnimationSpec {
 export const PET_POSES = [
   "idle-stand",
   "idle-sit",
-  "idle-prone",
-  "idle-lie",
-  "sleep-side",
   "walk-slow-left",
   "walk-slow-right",
   "walk-slow-up",
@@ -58,9 +52,6 @@ export const ANIMATIONS: Record<PetPose, AnimationSpec> = {
     atlasRow: 0,
   },
   "idle-sit": strip("/pet/extended-animations/idle-sit.png", 2),
-  "idle-prone": strip("/pet/extended-animations/idle-prone.png", 1.5),
-  "idle-lie": strip("/pet/extended-animations/idle-lie.png", 1.5),
-  "sleep-side": strip("/pet/extended-animations/sleep-side.png", 1),
   "walk-slow-left": strip("/pet/extended-animations/walk-slow-left.png", 5),
   "walk-slow-right": strip("/pet/extended-animations/walk-slow-right.png", 5),
   "walk-slow-up": strip("/pet/extended-animations/walk-slow-up.png", 5),
@@ -77,8 +68,6 @@ export const ANIMATIONS: Record<PetPose, AnimationSpec> = {
 export function poseForAction(action: PetAction, direction: Direction): PetPose {
   switch (action) {
     case PetAction.IDLE_SIT: return "idle-sit";
-    case PetAction.IDLE_PRONE: return "idle-prone";
-    case PetAction.IDLE_LIE: return "idle-lie";
     case PetAction.WALK_SLOW: return `walk-slow-${direction}`;
     case PetAction.SEARCH_SEAT: return "search-seat";
     case PetAction.SEARCH_CURRENT_WINDOW: return "search-current-window";

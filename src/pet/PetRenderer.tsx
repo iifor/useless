@@ -201,7 +201,7 @@ export default function PetRenderer({
 
   return (
     <canvas
-      aria-label="UNO"
+      aria-label="UNO PangYu"
       className="pet-canvas"
       height={DEFAULT_VIEWPORT_SIZE}
       onContextMenu={openContextMenu}

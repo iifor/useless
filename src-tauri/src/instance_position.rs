@@ -66,7 +66,7 @@ pub fn claim_instance_slot() -> usize {
     static SLOT: OnceLock<usize> = OnceLock::new();
     *SLOT.get_or_init(|| {
         for slot in 0..32 {
-            let name = format!(r"Local\UNO-Pet-Slot-{slot}");
+            let name = format!(r"Local\UNO-PangYu-Pet-Slot-{slot}");
             let wide_name: Vec<u16> = std::ffi::OsStr::new(&name)
                 .encode_wide()
                 .chain(Some(0))
@@ -98,7 +98,7 @@ pub fn position_main_window(app: &tauri::AppHandle) -> Result<(), String> {
 
     let window = app
         .get_webview_window("main")
-        .ok_or_else(|| "找不到 UNO 主窗口".to_owned())?;
+        .ok_or_else(|| "找不到 UNO PangYu 主窗口".to_owned())?;
     let monitor = window
         .current_monitor()
         .map_err(|error| error.to_string())?

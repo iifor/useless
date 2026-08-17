@@ -70,7 +70,7 @@ describe("Windows local build", () => {
     const root = await temporaryRoot();
     const release = join(root, "src-tauri", "target", WINDOWS_TARGET, "release");
     await mkdir(join(release, "bundle", "nsis", "invalid-setup.exe"), { recursive: true });
-    await writeFile(join(release, "black-shirt-companion.exe"), "app");
+    await writeFile(join(release, "uno-pangyu.exe"), "app");
 
     await expect(resolveBuildArtifacts(root)).rejects.toThrow("未找到 NSIS 安装包");
   });
@@ -99,7 +99,7 @@ describe("Windows local build", () => {
   test("runs prerequisites, build, resolution, and publication in order", async () => {
     const root = "/project";
     const calls = [];
-    const artifacts = [{ name: "UNO.exe" }];
+    const artifacts = [{ name: "UNO-PangYu.exe" }];
 
     await expect(runWindowsBuild({
       root,
@@ -134,10 +134,10 @@ describe("Windows local build", () => {
     const root = await temporaryRoot();
     const release = join(root, "src-tauri", "target", WINDOWS_TARGET, "release");
     const nsis = join(release, "bundle", "nsis");
-    const currentInstaller = join(nsis, "black-shirt-companion_1.0.0_x64-setup.exe");
-    const staleInstaller = join(nsis, "black-shirt-companion_9.0.0_x64-setup.exe");
+    const currentInstaller = join(nsis, "uno-pangyu_1.0.0_x64-setup.exe");
+    const staleInstaller = join(nsis, "uno-pangyu_9.0.0_x64-setup.exe");
     await mkdir(nsis, { recursive: true });
-    await writeFile(join(release, "black-shirt-companion.exe"), "portable");
+    await writeFile(join(release, "uno-pangyu.exe"), "portable");
     await writeFile(currentInstaller, "old current installer");
     await utimes(currentInstaller, 1, 1);
     await writeFile(staleInstaller, "stale future installer");
@@ -168,8 +168,8 @@ describe("Windows local build", () => {
     const root = await temporaryRoot();
     const release = join(root, "src-tauri", "target", WINDOWS_TARGET, "release");
     const nsis = join(release, "bundle", "nsis");
-    const application = join(release, "black-shirt-companion.exe");
-    const installer = join(nsis, "black-shirt-companion_1.0.0_x64-setup.exe");
+    const application = join(release, "uno-pangyu.exe");
+    const installer = join(nsis, "uno-pangyu_1.0.0_x64-setup.exe");
     await mkdir(nsis, { recursive: true });
     await writeFile(application, "portable");
     await writeFile(installer, "WXYZ");
@@ -217,7 +217,7 @@ describe("Windows local build", () => {
 
     await expect(snapshotInstallerCandidates(root, {
       fileSystem: {
-        readdir: async () => ["black-shirt-companion_1.0.0_x64-setup.exe"],
+        readdir: async () => ["uno-pangyu_1.0.0_x64-setup.exe"],
         stat: async () => { throw denied; },
       },
     })).rejects.toThrow("snapshot file denied");
@@ -229,7 +229,7 @@ describe("Windows local build", () => {
 
     await expect(snapshotInstallerCandidates(root, {
       fileSystem: {
-        readdir: async () => ["black-shirt-companion_1.0.0_x64-setup.exe"],
+        readdir: async () => ["uno-pangyu_1.0.0_x64-setup.exe"],
         stat: async () => ({
           isFile: () => true,
           size: 4,
@@ -248,8 +248,8 @@ describe("Windows local build", () => {
     const release = join(root, "src-tauri", "target", WINDOWS_TARGET, "release");
     const nsis = join(release, "bundle", "nsis");
     await mkdir(nsis, { recursive: true });
-    await writeFile(join(release, "black-shirt-companion.exe"), "portable");
-    await writeFile(join(nsis, "black-shirt-companion_1.0.0_x64-setup.exe"), "unchanged installer");
+    await writeFile(join(release, "uno-pangyu.exe"), "portable");
+    await writeFile(join(nsis, "uno-pangyu_1.0.0_x64-setup.exe"), "unchanged installer");
     const installersBeforeBuild = await snapshotInstallerCandidates(root);
 
     await expect(resolveBuildArtifacts(root, installersBeforeBuild))
@@ -261,9 +261,9 @@ describe("Windows local build", () => {
     const release = join(root, "src-tauri", "target", WINDOWS_TARGET, "release");
     const nsis = join(release, "bundle", "nsis");
     await mkdir(nsis, { recursive: true });
-    await writeFile(join(release, "black-shirt-companion.exe"), "portable");
-    const firstInstaller = join(nsis, "black-shirt-companion_1.0.0_x64-setup.exe");
-    const secondInstaller = join(nsis, "black-shirt-companion_2.0.0_x64-setup.exe");
+    await writeFile(join(release, "uno-pangyu.exe"), "portable");
+    const firstInstaller = join(nsis, "uno-pangyu_1.0.0_x64-setup.exe");
+    const secondInstaller = join(nsis, "uno-pangyu_2.0.0_x64-setup.exe");
     await writeFile(firstInstaller, "old installer one");
     await writeFile(secondInstaller, "old installer two");
 
@@ -295,7 +295,7 @@ describe("Windows local build", () => {
     const environment = { ...process.env };
     const pathKey = Object.keys(environment).find((key) => key.toLowerCase() === "path") ?? "Path";
     environment[pathKey] = `${binDirectory}${delimiter}${environment[pathKey] ?? ""}`;
-    const published = [{ name: "UNO.exe" }];
+    const published = [{ name: "UNO-PangYu.exe" }];
 
     await expect(runWindowsBuild({
       root,
@@ -326,9 +326,9 @@ describe("Windows local build", () => {
 
     const result = await publishArtifacts({ application, installer, releaseDirectory: release });
 
-    expect(await readFile(join(release, "UNO.exe"), "utf8")).toBe("new portable");
-    expect(await readFile(join(release, "UNO-Setup.exe"), "utf8")).toBe("new installer");
-    expect(result.map((artifact) => artifact.name)).toEqual(["UNO.exe", "UNO-Setup.exe"]);
+    expect(await readFile(join(release, "UNO-PangYu.exe"), "utf8")).toBe("new portable");
+    expect(await readFile(join(release, "UNO-PangYu-Setup.exe"), "utf8")).toBe("new installer");
+    expect(result.map((artifact) => artifact.name)).toEqual(["UNO-PangYu.exe", "UNO-PangYu-Setup.exe"]);
     expect(result.every((artifact) => artifact.bytes > 0 && artifact.sha256.length === 64)).toBe(true);
   });
 
@@ -336,8 +336,8 @@ describe("Windows local build", () => {
     const root = await temporaryRoot();
     const release = join(root, "release");
     await mkdir(release, { recursive: true });
-    await writeFile(join(release, "UNO.exe"), "old portable");
-    await writeFile(join(release, "UNO-Setup.exe"), "old installer");
+    await writeFile(join(release, "UNO-PangYu.exe"), "old portable");
+    await writeFile(join(release, "UNO-PangYu-Setup.exe"), "old installer");
 
     await expect(publishArtifacts({
       application: join(root, "missing-app.exe"),
@@ -345,8 +345,8 @@ describe("Windows local build", () => {
       releaseDirectory: release,
     })).rejects.toThrow();
 
-    expect(await readFile(join(release, "UNO.exe"), "utf8")).toBe("old portable");
-    expect(await readFile(join(release, "UNO-Setup.exe"), "utf8")).toBe("old installer");
+    expect(await readFile(join(release, "UNO-PangYu.exe"), "utf8")).toBe("old portable");
+    expect(await readFile(join(release, "UNO-PangYu-Setup.exe"), "utf8")).toBe("old installer");
   });
 
   test("restores both old artifacts when the second final rename fails", async () => {
@@ -359,8 +359,8 @@ describe("Windows local build", () => {
     await writeFile(application, "new portable");
     await writeFile(installer, "new installer");
     await mkdir(release, { recursive: true });
-    await writeFile(join(release, "UNO.exe"), "old portable");
-    await writeFile(join(release, "UNO-Setup.exe"), "old installer");
+    await writeFile(join(release, "UNO-PangYu.exe"), "old portable");
+    await writeFile(join(release, "UNO-PangYu-Setup.exe"), "old installer");
 
     await expect(publishArtifacts({
       application,
@@ -368,7 +368,7 @@ describe("Windows local build", () => {
       releaseDirectory: release,
       fileSystem: {
         rename: async (from, to) => {
-          if (from.includes("UNO-Setup.exe.new-") && to.endsWith("UNO-Setup.exe")) {
+          if (from.includes("UNO-PangYu-Setup.exe.new-") && to.endsWith("UNO-PangYu-Setup.exe")) {
             throw new Error("second final rename failed");
           }
           await renameFile(from, to);
@@ -376,8 +376,8 @@ describe("Windows local build", () => {
       },
     })).rejects.toThrow("second final rename failed");
 
-    expect(await readFile(join(release, "UNO.exe"), "utf8")).toBe("old portable");
-    expect(await readFile(join(release, "UNO-Setup.exe"), "utf8")).toBe("old installer");
+    expect(await readFile(join(release, "UNO-PangYu.exe"), "utf8")).toBe("old portable");
+    expect(await readFile(join(release, "UNO-PangYu-Setup.exe"), "utf8")).toBe("old installer");
   });
 
   test("retains the old backup when rollback recovery fails", async () => {
@@ -390,8 +390,8 @@ describe("Windows local build", () => {
     await writeFile(application, "new portable");
     await writeFile(installer, "new installer");
     await mkdir(release, { recursive: true });
-    await writeFile(join(release, "UNO.exe"), "old portable");
-    await writeFile(join(release, "UNO-Setup.exe"), "old installer");
+    await writeFile(join(release, "UNO-PangYu.exe"), "old portable");
+    await writeFile(join(release, "UNO-PangYu-Setup.exe"), "old installer");
     let finalizationFailed = false;
 
     await expect(publishArtifacts({
@@ -400,11 +400,11 @@ describe("Windows local build", () => {
       releaseDirectory: release,
       fileSystem: {
         rename: async (from, to) => {
-          if (from.includes("UNO-Setup.exe.new-") && to.endsWith("UNO-Setup.exe")) {
+          if (from.includes("UNO-PangYu-Setup.exe.new-") && to.endsWith("UNO-PangYu-Setup.exe")) {
             finalizationFailed = true;
             throw new Error("second final rename failed");
           }
-          if (finalizationFailed && from.includes("UNO.exe.backup-") && to.endsWith("UNO.exe")) {
+          if (finalizationFailed && from.includes("UNO-PangYu.exe.backup-") && to.endsWith("UNO-PangYu.exe")) {
             throw new Error("portable restore failed");
           }
           await renameFile(from, to);
@@ -412,10 +412,10 @@ describe("Windows local build", () => {
       },
     })).rejects.toThrow("恢复旧产物失败");
 
-    const backup = (await readdir(release)).find((name) => name.startsWith("UNO.exe.backup-"));
+    const backup = (await readdir(release)).find((name) => name.startsWith("UNO-PangYu.exe.backup-"));
     expect(backup).toBeDefined();
     expect(await readFile(join(release, backup), "utf8")).toBe("old portable");
-    expect(await readFile(join(release, "UNO-Setup.exe"), "utf8")).toBe("old installer");
+    expect(await readFile(join(release, "UNO-PangYu-Setup.exe"), "utf8")).toBe("old installer");
   });
 });
 

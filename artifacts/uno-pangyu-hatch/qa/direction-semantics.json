@@ -1,0 +1,29 @@
+{
+  "ok": true,
+  "reviewed_by": "parent",
+  "independent_visual_qa": "independent-direction-review.json",
+  "blind_validation": "direction-blind-validation.json",
+  "directions": [
+    { "direction": "000", "expected": "up", "observed": "up", "status": "pass", "evidence": "centered face, chin and nose lifted" },
+    { "direction": "022.5", "expected": "up-right", "observed": "up-right", "status": "pass", "evidence": "raised chin with image-right face shift" },
+    { "direction": "045", "expected": "up-right", "observed": "up-right", "status": "pass", "evidence": "clear elevated right profile" },
+    { "direction": "067.5", "expected": "up-right", "observed": "up-right", "status": "pass", "evidence": "strong right profile with raised chin" },
+    { "direction": "090", "expected": "screen-right", "observed": "screen-right", "status": "pass", "evidence": "nose and face project image-right" },
+    { "direction": "112.5", "expected": "down-right", "observed": "down-right", "status": "pass", "evidence": "right profile with lowered chin" },
+    { "direction": "135", "expected": "down-right", "observed": "down-right", "status": "pass", "evidence": "bowed head retains image-right profile" },
+    { "direction": "157.5", "expected": "down-right", "observed": "down-right", "status": "pass", "evidence": "deepening bow retains right component" },
+    { "direction": "180", "expected": "down", "observed": "deep down bow", "status": "pass", "evidence": "head and upper torso bow forward; face hidden by coiffure" },
+    { "direction": "202.5", "expected": "down-left", "observed": "down-left", "status": "pass", "evidence": "rises from bow with image-left profile" },
+    { "direction": "225", "expected": "down-left", "observed": "down-left", "status": "pass", "evidence": "lowered head and clear left profile" },
+    { "direction": "247.5", "expected": "down-left", "observed": "down-left", "status": "pass", "evidence": "left profile with shallow downward tilt" },
+    { "direction": "270", "expected": "screen-left", "observed": "screen-left", "status": "pass", "evidence": "nose and face project image-left" },
+    { "direction": "292.5", "expected": "up-left", "observed": "up-left", "status": "pass", "evidence": "left profile with rising chin" },
+    { "direction": "315", "expected": "up-left", "observed": "up-left", "status": "pass", "evidence": "clear elevated left profile" },
+    { "direction": "337.5", "expected": "up-left", "observed": "up-left", "status": "pass", "evidence": "up-left profile approaches centered up pose" }
+  ],
+  "continuity": {
+    "status": "accepted_with_warning",
+    "decision": "The larger 157.5→180→202.5 change is a deliberate deep-bow cardinal action, not a broken registration or identity snap."
+  },
+  "summary": "All four cardinals and all intermediate quadrants pass; three-worker blind validation has no warnings or unconfirmed directions."
+}

@@ -1,7 +1,7 @@
 {
-  "name": "black-shirt-companion-desktop",
+  "name": "uno-pangyu-desktop",
   "private": true,
-  "version": "0.1.2",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite --port 1420",
@@ -11,8 +11,7 @@
     "tauri:build": "tauri build",
     "dmg": "tauri build --bundles dmg --no-sign",
     "exe": "tauri build --target x86_64-pc-windows-msvc --bundles nsis --no-sign",
-    "build:windows": "node scripts/build-windows.mjs",
-    "release": "node scripts/release.mjs"
+    "build:windows": "node scripts/build-windows.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",

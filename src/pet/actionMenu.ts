@@ -4,8 +4,6 @@ import type { Point, Size } from "./windowMotion";
 export const MANUAL_ACTIONS = [
   PetAction.IDLE_STAND,
   PetAction.IDLE_SIT,
-  PetAction.IDLE_PRONE,
-  PetAction.IDLE_LIE,
   PetAction.WALK_SLOW,
   PetAction.SEARCH_SEAT,
   PetAction.SEARCH_CURRENT_WINDOW,
@@ -18,8 +16,6 @@ export type ManualAction = typeof MANUAL_ACTIONS[number];
 const MANUAL_ACTION_LABELS: Record<ManualAction, string> = {
   [PetAction.IDLE_STAND]: "站着",
   [PetAction.IDLE_SIT]: "坐着",
-  [PetAction.IDLE_PRONE]: "趴着",
-  [PetAction.IDLE_LIE]: "侧躺",
   [PetAction.WALK_SLOW]: "慢慢走",
   [PetAction.SEARCH_SEAT]: "寻找桌面座位",
   [PetAction.SEARCH_CURRENT_WINDOW]: "坐到当前窗口",

@@ -109,6 +109,14 @@ test("uses one shared visible size for every pet pose", () => {
   expect(new Set(PET_POSES.map(contentLongEdgeForPose))).toEqual(new Set([119]));
 });
 
+test("does not include prone, lying, or sleeping poses", () => {
+  expect(PET_POSES).not.toEqual(expect.arrayContaining([
+    "idle-prone",
+    "idle-lie",
+    "sleep-side",
+  ]));
+});
+
 test("crops an animation to the aligned alpha union plus eight pixels of padding", () => {
   expect(computeAnimationViewport([
     { bounds: { minX: 10, minY: 20, maxX: 110, maxY: 170 }, anchorX: 60 },
