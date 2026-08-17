@@ -58,6 +58,16 @@ describe("action scheduling", () => {
     expect(nextAction(PetAction.SEARCH_SEAT, values(0.01, 0))).not.toBe(PetAction.SEARCH_SEAT);
   });
 
+  test("automatic mode can cycle through sit, walk, and stand", () => {
+    expect(nextAction(PetAction.IDLE_STAND, values(0.08, 0)))
+      .toBe(PetAction.IDLE_SIT);
+    expect(nextAction(PetAction.IDLE_SIT, values(0.08, 0.999)))
+      .toBe(PetAction.WALK_SLOW);
+    expect(nextAction(PetAction.WALK_SLOW, values(0.08, 0)))
+      .toBe(PetAction.IDLE_STAND);
+    expect(resumeAutomatic()).toEqual({ auto: true, action: PetAction.IDLE_STAND });
+  });
+
   test("creates a seat when desktop is empty or the 10 percent roll wins", () => {
     expect(shouldCreateSeat(0, () => 0.99)).toBe(true);
     expect(shouldCreateSeat(3, () => 0.099)).toBe(true);
