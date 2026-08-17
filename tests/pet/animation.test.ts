@@ -105,10 +105,8 @@ test("uses one scale that normalizes the largest animation frame to 200 pixels",
   ], 180)).toBe(1.2);
 });
 
-test("keeps prone poses smaller after reducing every pet pose by thirty percent", () => {
-  expect(contentLongEdgeForPose("idle-stand")).toBe(119);
-  expect(contentLongEdgeForPose("idle-sit")).toBe(119);
-  expect(contentLongEdgeForPose("idle-prone")).toBe(102);
+test("uses one shared visible size for every pet pose", () => {
+  expect(new Set(PET_POSES.map(contentLongEdgeForPose))).toEqual(new Set([119]));
 });
 
 test("crops an animation to the aligned alpha union plus eight pixels of padding", () => {
