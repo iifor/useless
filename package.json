@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port 1420",
+    "dev:windows": "node scripts/dev-windows.mjs",
     "build": "tsc -b && vite build",
     "test": "vitest run",
     "tauri": "tauri",
