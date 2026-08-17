@@ -35,7 +35,7 @@ export const PET_POSES = [
 ] as const satisfies readonly PetPose[];
 
 export const contentLongEdgeForPose = (pose: PetPose): number =>
-  pose === "idle-prone" ? 145 : 170;
+  pose === "idle-prone" ? 102 : 119;
 
 export const ANIMATIONS: Record<PetPose, AnimationSpec> = {
   "idle-stand": {
