@@ -235,31 +235,65 @@ describe("window movement", () => {
       .toEqual({ x: 1000, y: 460 });
   });
 
-  test("uses one direct segment for vertical and diagonal targets", () => {
+  test("uses axis-aligned segments for vertical, horizontal, and diagonal targets", () => {
+    const area = { x: 0, y: 0, width: 1440, height: 900 };
+    const size = { width: 280, height: 320 };
+
     expect(planWalkPath(
       { x: 500, y: 100 },
       { x: 500, y: 500 },
-      { x: 0, y: 0, width: 1440, height: 900 },
-      { width: 280, height: 320 },
+      area,
+      size,
       1,
     )).toEqual([{ x: 500, y: 500 }]);
     expect(planWalkPath(
       { x: 100, y: 100 },
-      { x: 500, y: 500 },
-      { x: 0, y: 0, width: 1440, height: 900 },
-      { width: 280, height: 320 },
+      { x: 500, y: 100 },
+      area,
+      size,
       1,
-    )).toEqual([{ x: 500, y: 500 }]);
+    )).toEqual([{ x: 500, y: 100 }]);
+    expect(planWalkPath(
+      { x: 100, y: 100 },
+      { x: 500, y: 500 },
+      area,
+      size,
+      1,
+    )).toEqual([{ x: 500, y: 100 }, { x: 500, y: 500 }]);
   });
 
-  test("clamps a direct path at the monitor edge", () => {
+  test("clamps the target before creating an axis-aligned path", () => {
     expect(planWalkPath(
       { x: 500, y: 100 },
       { x: 2000, y: 2000 },
       { x: 0, y: 0, width: 1440, height: 900 },
       { width: 280, height: 320 },
       1,
-    )).toEqual([{ x: 1160, y: 580 }]);
+    )).toEqual([{ x: 1160, y: 100 }, { x: 1160, y: 580 }]);
+  });
+
+  test("never returns a diagonal segment and omits an unchanged target", () => {
+    const current = { x: 120, y: 140 };
+    const path = planWalkPath(
+      current,
+      { x: 760, y: 520 },
+      { x: 0, y: 0, width: 1200, height: 800 },
+      { width: 120, height: 160 },
+      1,
+    );
+    const points = [current, ...path];
+
+    for (let index = 1; index < points.length; index += 1) {
+      expect(points[index].x === points[index - 1].x
+        || points[index].y === points[index - 1].y).toBe(true);
+    }
+    expect(planWalkPath(
+      current,
+      current,
+      { x: 0, y: 0, width: 1200, height: 800 },
+      { width: 120, height: 160 },
+      1,
+    )).toEqual([]);
   });
 });
 
