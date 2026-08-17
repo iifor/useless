@@ -9,6 +9,7 @@ import {
   nextAction,
   shouldClearSeatAfterAction,
   shouldResumeAfterDrag,
+  type Direction,
 } from "./pet/actions";
 import { poseForAction } from "./pet/animations";
 import FoodInteraction, {
@@ -67,7 +68,7 @@ const waitForFood = (milliseconds: number) =>
 
 export default function App() {
   const [action, setAction] = useState(PetAction.IDLE_STAND);
-  const [direction, setDirection] = useState<"left" | "right">("right");
+  const [direction, setDirection] = useState<Direction>("right");
   const [seat, setSeat] = useState<DesktopSeatTarget | null>(null);
   const [automatic, setAutomatic] = useState(true);
   const [manual, setManual] = useState<ManualAction>(PetAction.IDLE_STAND);
@@ -129,11 +130,13 @@ export default function App() {
       });
     };
 
-    const seatSequence = async (mode: SeatSearchMode = "auto") => {
+    const seatSequence = async (searchAction: PetAction = PetAction.SEARCH_SEAT) => {
+      const mode: SeatSearchMode | null = seatSearchModeForAction(searchAction);
+      if (!mode) return;
       let target: DesktopSeatTarget | null = null;
       try {
-        if (isCurrent()) setAction(PetAction.SEARCH_SEAT);
-        await delay(actionDurationMs(PetAction.SEARCH_SEAT), signal);
+        if (isCurrent()) setAction(searchAction);
+        await delay(actionDurationMs(searchAction), signal);
         target = await findSeatTarget(mode);
         if (!target || !isCurrent()) return;
         setAction(PetAction.WALK_SLOW);
@@ -214,7 +217,7 @@ export default function App() {
         }
         const seatMode = seatSearchModeForAction(manual);
         if (seatMode) {
-          await seatSequence(seatMode);
+          await seatSequence(manual);
           if (isCurrent()) setAction(PetAction.IDLE_STAND);
         }
         if (manual === PetAction.SEAT_ON_ITEM) setSeat({

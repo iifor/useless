@@ -151,7 +151,6 @@ impl From<Point> for SeatAnchor {
 
 struct TargetContext {
     work_area: Rect,
-    pet_height: f64,
     scale_factor: f64,
 }
 
@@ -171,7 +170,6 @@ fn target_context(app: &AppHandle) -> Result<TargetContext, String> {
         .current_monitor()
         .map_err(|error| error.to_string())?
         .ok_or_else(|| "无法确定宠物当前显示器".to_owned())?;
-    let pet_size = window.outer_size().map_err(|error| error.to_string())?;
     Ok(TargetContext {
         work_area: Rect::new(
             f64::from(monitor.work_area().position.x),
@@ -179,7 +177,6 @@ fn target_context(app: &AppHandle) -> Result<TargetContext, String> {
             f64::from(monitor.work_area().size.width),
             f64::from(monitor.work_area().size.height),
         ),
-        pet_height: f64::from(pet_size.height),
         scale_factor: monitor.scale_factor(),
     })
 }
@@ -191,12 +188,8 @@ pub async fn find_seat_targets(
 ) -> Result<Vec<DesktopSeatTarget>, String> {
     let context = target_context(&app)?;
     let windows = platform_windows(&context)?;
-    let visible_windows = visible_window_targets(
-        windows.clone(),
-        context.work_area,
-        std::process::id(),
-        context.pet_height,
-    );
+    let visible_windows =
+        visible_window_targets(windows.clone(), context.work_area, std::process::id());
     if let Some(target) = window_target_for_mode(&visible_windows, mode) {
         return Ok(vec![DesktopSeatTarget::window(target)]);
     }
@@ -227,7 +220,6 @@ pub fn refresh_window_seat(
         platform_windows(&context)?,
         context.work_area,
         std::process::id(),
-        context.pet_height,
     )
     .into_iter()
     .find(|target| target.native_id == native_window_id)
@@ -284,12 +276,16 @@ fn parse_finder_items(value: &str) -> Vec<FinderItem> {
             let path = fields.next()?.to_owned();
             let x = fields.next()?.parse().ok()?;
             let y = fields.next()?.parse().ok()?;
-            let width = fields.next()?.parse().ok()?;
-            let height = fields.next()?.parse().ok()?;
-            (fields.next().is_none() && !path.is_empty()).then(|| FinderItem {
-                path,
-                bounds: Rect::new(x, y, width, height),
-            })
+            let right: f64 = fields.next()?.parse().ok()?;
+            let bottom: f64 = fields.next()?.parse().ok()?;
+            let width = right - x;
+            let height = bottom - y;
+            (fields.next().is_none() && !path.is_empty() && width > 0.0 && height > 0.0).then(
+                || FinderItem {
+                    path,
+                    bounds: Rect::new(x, y, width, height),
+                },
+            )
         })
         .collect()
 }
@@ -298,7 +294,6 @@ fn visible_window_targets(
     windows: Vec<RawWindow>,
     work_area: Rect,
     own_pid: u32,
-    pet_height: f64,
 ) -> Vec<WindowTarget> {
     windows
         .into_iter()
@@ -310,7 +305,6 @@ fn visible_window_targets(
                 && window.bounds.width >= 100.0
                 && window.bounds.height >= 60.0
                 && window.bounds.intersects(work_area)
-                && window.bounds.y - work_area.y >= pet_height
         })
         .map(|window| WindowTarget {
             native_id: window.id.to_string(),
@@ -328,14 +322,12 @@ fn focused_window_target(windows: &[WindowTarget]) -> Option<WindowTarget> {
     windows.iter().find(|window| window.focused).cloned()
 }
 
-fn window_target_for_mode(
-    windows: &[WindowTarget],
-    mode: SeatSearchMode,
-) -> Option<WindowTarget> {
+fn window_target_for_mode(windows: &[WindowTarget], mode: SeatSearchMode) -> Option<WindowTarget> {
     match mode {
         SeatSearchMode::Auto => focused_window_target(windows),
-        SeatSearchMode::FocusedWindow => focused_window_target(windows)
-            .or_else(|| windows.first().cloned()),
+        SeatSearchMode::FocusedWindow => {
+            focused_window_target(windows).or_else(|| windows.first().cloned())
+        }
         SeatSearchMode::DesktopIcon => None,
     }
 }
@@ -469,12 +461,11 @@ async fn platform_desktop_items(
     const SCRIPT: &str = r#"
 tell application "Finder"
   set outputText to ""
-  set iconSizeValue to icon size of icon view options of desktop
   repeat with desktopItem in every item of desktop
     try
       set itemPath to POSIX path of (desktopItem as alias)
-      set itemPosition to desktop position of desktopItem
-      set outputText to outputText & itemPath & tab & (item 1 of itemPosition as text) & tab & (item 2 of itemPosition as text) & tab & (iconSizeValue as text) & tab & (iconSizeValue as text) & linefeed
+      set itemBounds to bounds of desktopItem
+      set outputText to outputText & itemPath & tab & (item 1 of itemBounds as text) & tab & (item 2 of itemBounds as text) & tab & (item 3 of itemBounds as text) & tab & (item 4 of itemBounds as text) & linefeed
     end try
   end repeat
   return outputText
@@ -621,7 +612,7 @@ foreach ($item in $items) {
     $rect = $item.Current.BoundingRectangle
     if ($rect.Width -le 0 -or $rect.Height -le 0) { continue }
     $name = ($item.Current.Name -replace "`t|`r|`n", " ")
-    "$name`t$([math]::Round($rect.Left))`t$([math]::Round($rect.Top))`t$([math]::Round($rect.Width))`t$([math]::Round($rect.Height))"
+    "$name`t$([math]::Round($rect.Left))`t$([math]::Round($rect.Top))`t$([math]::Round($rect.Right))`t$([math]::Round($rect.Bottom))"
   } catch {}
 }
 "#;
@@ -702,15 +693,15 @@ mod tests {
     }
 
     #[test]
-    fn parses_finder_positions_and_rejects_malformed_rows() {
-        let items = parse_finder_items("/Users/me/Desktop/a.txt\t100\t200\t64\t64\ninvalid");
+    fn parses_finder_bounds_and_rejects_malformed_rows() {
+        let items = parse_finder_items("/Users/me/Desktop/a.txt\t100\t200\t164\t264\ninvalid");
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].path, "/Users/me/Desktop/a.txt");
         assert_eq!(items[0].bounds, Rect::new(100.0, 200.0, 64.0, 64.0));
     }
 
     #[test]
-    fn filters_self_hidden_minimized_tool_and_no_clearance_windows() {
+    fn filters_self_hidden_minimized_and_tool_windows() {
         let work_area = Rect::new(0.0, 24.0, 1440.0, 876.0);
         let visible = RawWindow::normal(7, 200, Rect::new(300.0, 300.0, 600.0, 400.0));
         let candidates = vec![
@@ -731,16 +722,31 @@ mod tests {
                 tool: true,
                 ..visible.clone()
             },
-            RawWindow {
-                bounds: Rect::new(300.0, 100.0, 600.0, 400.0),
-                ..visible
-            },
         ];
 
-        let targets = visible_window_targets(candidates, work_area, 100, 200.0);
+        let targets = visible_window_targets(candidates, work_area, 100);
         assert_eq!(targets.len(), 1);
         assert_eq!(targets[0].native_id, "7");
         assert_eq!(targets[0].anchor, Point { x: 600.0, y: 300.0 });
+    }
+
+    #[test]
+    fn keeps_the_focused_top_edge_window_instead_of_selecting_another_window() {
+        let work_area = Rect::new(0.0, 24.0, 1440.0, 876.0);
+        let focused = RawWindow {
+            focused: true,
+            ..RawWindow::normal(7, 200, Rect::new(100.0, 30.0, 900.0, 700.0))
+        };
+        let other = RawWindow::normal(8, 201, Rect::new(300.0, 300.0, 600.0, 400.0));
+
+        let targets = visible_window_targets(vec![focused, other], work_area, 100);
+
+        assert_eq!(
+            window_target_for_mode(&targets, SeatSearchMode::FocusedWindow)
+                .unwrap()
+                .native_id,
+            "7"
+        );
     }
 
     #[test]
@@ -753,7 +759,7 @@ mod tests {
         };
         let background = RawWindow::normal(8, 201, bounds);
 
-        let targets = visible_window_targets(vec![background, focused], work_area, 100, 200.0);
+        let targets = visible_window_targets(vec![background, focused], work_area, 100);
 
         assert_eq!(focused_window_target(&targets).unwrap().native_id, "7");
     }
@@ -768,7 +774,7 @@ mod tests {
         };
         let background = RawWindow::normal(8, 201, bounds);
 
-        let targets = visible_window_targets(vec![own, background], work_area, 100, 200.0);
+        let targets = visible_window_targets(vec![own, background], work_area, 100);
 
         assert!(focused_window_target(&targets).is_none());
     }

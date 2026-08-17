@@ -106,7 +106,7 @@ export async function runFoodSelection(
   flowRef.current = looking;
   effects.setFlow(looking);
   effects.setAction(PetAction.LOOK_AT_FILE);
-  await effects.wait(800);
+  await effects.wait(1_000);
   const confirming = advanceToConfirmation(looking);
   flowRef.current = confirming;
   effects.setFlow(confirming);

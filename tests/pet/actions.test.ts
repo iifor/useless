@@ -33,9 +33,15 @@ describe("action scheduling", () => {
   });
 
   test("plays the seat-search animation for two to four seconds", () => {
-    expect(actionDurationMs(PetAction.SEARCH_SEAT, () => 0)).toBe(2_000);
-    expect(actionDurationMs(PetAction.SEARCH_SEAT, () => 0.999)).toBeLessThanOrEqual(4_000);
-    expect(actionDurationMs(PetAction.SEARCH_SEAT, () => 0.999)).toBeGreaterThan(2_000);
+    for (const action of [
+      PetAction.SEARCH_SEAT,
+      PetAction.SEARCH_CURRENT_WINDOW,
+      PetAction.SEARCH_DESKTOP_ICON,
+    ]) {
+      expect(actionDurationMs(action, () => 0)).toBe(2_000);
+      expect(actionDurationMs(action, () => 0.999)).toBeLessThanOrEqual(4_000);
+      expect(actionDurationMs(action, () => 0.999)).toBeGreaterThan(2_000);
+    }
   });
 
   test("selects the seat action below the 8 percent boundary", () => {
@@ -93,23 +99,37 @@ describe("action scheduling", () => {
 
   test("maps every action to a valid animation pose", () => {
     for (const action of Object.values(PetAction)) {
-      expect(poseForAction(action, "left")).toBeTruthy();
-      expect(poseForAction(action, "right")).toBeTruthy();
+      for (const direction of ["left", "right", "up", "down"] as const) {
+        expect(poseForAction(action, direction)).toBeTruthy();
+      }
     }
   });
 
+  test("maps each walking direction to its own pose", () => {
+    expect(poseForAction(PetAction.WALK_SLOW, "left")).toBe("walk-slow-left");
+    expect(poseForAction(PetAction.WALK_SLOW, "right")).toBe("walk-slow-right");
+    expect(poseForAction(PetAction.WALK_SLOW, "up")).toBe("walk-slow-up");
+    expect(poseForAction(PetAction.WALK_SLOW, "down")).toBe("walk-slow-down");
+    expect(ANIMATIONS["walk-slow-up"]).toMatchObject({ frameCount: 4, fps: 5 });
+    expect(ANIMATIONS["walk-slow-down"]).toMatchObject({ frameCount: 4, fps: 5 });
+  });
+
   test("maps food actions to valid poses", () => {
-    expect(poseForAction(PetAction.LOOK_AT_FILE, "right")).toBe("idle-stand");
-    expect(poseForAction(PetAction.ASK_CONFIRM, "right")).toBe("idle-stand");
+    expect(poseForAction(PetAction.LOOK_AT_FILE, "right")).toBe("look-file");
+    expect(poseForAction(PetAction.ASK_CONFIRM, "right")).toBe("ask-confirm");
     expect(poseForAction(PetAction.EAT_NORMAL, "right")).toBe("eat-normal");
+    expect(ANIMATIONS["look-file"]).toMatchObject({ frameCount: 4, fps: 4 });
+    expect(ANIMATIONS["ask-confirm"]).toMatchObject({ frameCount: 4, fps: 2 });
     expect(ANIMATIONS["eat-normal"].frameCount).toBe(4);
   });
 
   test("uses a dedicated four-frame animation while searching for a seat", () => {
     expect(poseForAction(PetAction.SEARCH_SEAT, "right")).toBe("search-seat");
-    expect(poseForAction(PetAction.SEARCH_CURRENT_WINDOW, "right")).toBe("search-seat");
-    expect(poseForAction(PetAction.SEARCH_DESKTOP_ICON, "right")).toBe("search-seat");
+    expect(poseForAction(PetAction.SEARCH_CURRENT_WINDOW, "right")).toBe("search-current-window");
+    expect(poseForAction(PetAction.SEARCH_DESKTOP_ICON, "right")).toBe("search-desktop-icon");
     expect(ANIMATIONS["search-seat"].frameCount).toBe(4);
+    expect(ANIMATIONS["search-current-window"]).toMatchObject({ frameCount: 4, fps: 1.5 });
+    expect(ANIMATIONS["search-desktop-icon"]).toMatchObject({ frameCount: 4, fps: 1.5 });
   });
 });
 
@@ -173,9 +193,11 @@ describe("window movement", () => {
     expect(stepTowards({ x: 1, y: 1 }, { x: 2, y: 1 }, 5)).toEqual({ x: 2, y: 1 });
   });
 
-  test("faces the dominant horizontal direction", () => {
-    expect(directionForMove({ x: 10, y: 0 }, { x: 2, y: 20 })).toBe("left");
-    expect(directionForMove({ x: 2, y: 20 }, { x: 10, y: 0 })).toBe("right");
+  test("faces the dominant movement axis", () => {
+    expect(directionForMove({ x: 10, y: 10 }, { x: 0, y: 12 })).toBe("left");
+    expect(directionForMove({ x: 10, y: 10 }, { x: 20, y: 8 })).toBe("right");
+    expect(directionForMove({ x: 10, y: 10 }, { x: 12, y: 0 })).toBe("up");
+    expect(directionForMove({ x: 10, y: 10 }, { x: 8, y: 20 })).toBe("down");
   });
 
   test("varies random walk distance continuously from 240 to 720 CSS pixels", () => {
@@ -192,63 +214,46 @@ describe("window movement", () => {
     expect(Math.hypot(long.x - current.x, long.y - current.y)).toBeCloseTo(720);
   });
 
-  test("keeps the actual random walk angle within 30 degrees after clamping", () => {
-    const current = { x: 16, y: 300 };
-    const target = randomWalkTarget(
-      current,
+  test("allows random walks across the full circle", () => {
+    const area = { x: 0, y: 0, width: 2200, height: 1600 };
+    const size = { width: 120, height: 140 };
+    const current = { x: 1000, y: 700 };
+
+    expect(randomWalkTarget(current, area, size, 1, values(0, 0)))
+      .toEqual({ x: 1240, y: 700 });
+    expect(randomWalkTarget(current, area, size, 1, values(0, 0.25)))
+      .toEqual({ x: 1000, y: 940 });
+    expect(randomWalkTarget(current, area, size, 1, values(0, 0.5)))
+      .toEqual({ x: 760, y: 700 });
+    expect(randomWalkTarget(current, area, size, 1, values(0, 0.75)))
+      .toEqual({ x: 1000, y: 460 });
+  });
+
+  test("uses one direct segment for vertical and diagonal targets", () => {
+    expect(planWalkPath(
+      { x: 500, y: 100 },
+      { x: 500, y: 500 },
       { x: 0, y: 0, width: 1440, height: 900 },
       { width: 280, height: 320 },
       1,
-      values(0.5, 1, 0.25),
-    );
-    const angle = Math.atan2(Math.abs(target.y - current.y), Math.abs(target.x - current.x));
-
-    expect(angle).toBeLessThanOrEqual(Math.PI / 6 + 1e-9);
-    expect(target.x).toBeGreaterThanOrEqual(16);
-    expect(target.y).toBeGreaterThanOrEqual(16);
-  });
-
-  test("plans low-slope waypoints for a vertically aligned target", () => {
-    const current = { x: 500, y: 100 };
-    const target = { x: 500, y: 500 };
-    const path = planWalkPath(
-      current,
-      target,
-      { x: 0, y: 0, width: 1440, height: 900 },
-      { width: 280, height: 320 },
-      1,
-    );
-    expect(path.at(-1)).toEqual(target);
-
-    let start = current;
-    for (const waypoint of path) {
-      const angle = Math.atan2(
-        Math.abs(waypoint.y - start.y),
-        Math.abs(waypoint.x - start.x),
-      );
-      expect(angle).toBeLessThanOrEqual(Math.PI / 6 + 1e-9);
-      start = waypoint;
-    }
-  });
-
-  test("uses one segment for a target already within 30 degrees", () => {
+    )).toEqual([{ x: 500, y: 500 }]);
     expect(planWalkPath(
       { x: 100, y: 100 },
-      { x: 500, y: 200 },
+      { x: 500, y: 500 },
       { x: 0, y: 0, width: 1440, height: 900 },
       { width: 280, height: 320 },
       1,
-    )).toEqual([{ x: 500, y: 200 }]);
+    )).toEqual([{ x: 500, y: 500 }]);
   });
 
-  test("does not attempt a pure vertical move without horizontal room", () => {
+  test("clamps a direct path at the monitor edge", () => {
     expect(planWalkPath(
-      { x: 0, y: 100 },
-      { x: 0, y: 400 },
-      { x: 0, y: 0, width: 280, height: 900 },
+      { x: 500, y: 100 },
+      { x: 2000, y: 2000 },
+      { x: 0, y: 0, width: 1440, height: 900 },
       { width: 280, height: 320 },
       1,
-    )).toEqual([]);
+    )).toEqual([{ x: 1160, y: 580 }]);
   });
 });
 

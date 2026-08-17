@@ -181,7 +181,7 @@ test("selected food looks at the target before asking for confirmation", async (
   expect(current.stage).toBe("confirming");
   expect(stages).toEqual(["looking", "confirming"]);
   expect(actions).toEqual([PetAction.LOOK_AT_FILE, PetAction.ASK_CONFIRM]);
-  expect(waits).toEqual([800]);
+  expect(waits).toEqual([1_000]);
   expect(finished).toBe(0);
 });
 
