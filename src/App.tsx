@@ -143,7 +143,7 @@ export default function App() {
         await waitForPetWindowLayout();
         if (!isCurrent()) return;
         let destination = target.seatAnchor
-          ? await seatWindowDestination(target.seatAnchor)
+          ? await seatWindowDestination(target.seatAnchor, target.kind === "window" ? -8 : 0)
           : await randomWindowDestination();
         if (!isCurrent()) return;
         if (shouldRenderSeatMarker(target)) {
@@ -173,7 +173,7 @@ export default function App() {
           if (seatTargetChanged(target, refreshed)) {
             target = refreshed;
             await moveWindowTo(
-              await seatWindowDestination(refreshed.seatAnchor),
+              await seatWindowDestination(refreshed.seatAnchor, -8),
               signal,
               (value) => { if (isCurrent()) setDirection(value); },
             );

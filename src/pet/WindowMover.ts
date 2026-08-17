@@ -112,7 +112,10 @@ export async function containCurrentWindow(): Promise<void> {
   }
 }
 
-export async function seatWindowDestination(anchor: Point): Promise<Point> {
+export async function seatWindowDestination(
+  anchor: Point,
+  verticalOffsetCss = 0,
+): Promise<Point> {
   if (!("__TAURI_INTERNALS__" in window)) return anchor;
   const petWindow = getCurrentWindow();
   const [size, monitor] = await Promise.all([petWindow.outerSize(), currentMonitor()]);
@@ -121,6 +124,7 @@ export async function seatWindowDestination(anchor: Point): Promise<Point> {
     anchor,
     size,
     { ...monitor.workArea.position, ...monitor.workArea.size },
+    verticalOffsetCss * monitor.scaleFactor,
   );
 }
 

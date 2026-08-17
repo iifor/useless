@@ -106,6 +106,21 @@ test("aligns the pet bottom center to a physical seat anchor at 1x and 2x", () =
   )).toEqual({ x: 880, y: 400 });
 });
 
+test("moves a window seat upward by the supplied physical offset", () => {
+  expect(windowPositionForSeatAnchor(
+    { x: 500, y: 400 },
+    { width: 120, height: 200 },
+    { x: 0, y: 0, width: 1600, height: 1000 },
+    -8,
+  )).toEqual({ x: 440, y: 192 });
+  expect(windowPositionForSeatAnchor(
+    { x: 1000, y: 800 },
+    { width: 240, height: 400 },
+    { x: 0, y: 0, width: 3200, height: 2000 },
+    -16,
+  )).toEqual({ x: 880, y: 384 });
+});
+
 function target(kind: "file" | "window", id: string): DesktopSeatTarget {
   return {
     id,

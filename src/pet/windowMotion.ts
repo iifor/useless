@@ -37,7 +37,12 @@ export const windowPositionForSeatAnchor = (
   anchor: Point,
   petSize: Size,
   workArea: Rect,
-): Point => windowPositionForBottomCenter(anchor, petSize, workArea);
+  verticalOffsetPhysical = 0,
+): Point => windowPositionForBottomCenter(
+  { x: anchor.x, y: anchor.y + verticalOffsetPhysical },
+  petSize,
+  workArea,
+);
 
 export const relativeToBottomCenter = (point: Point, size: Size): Point => ({
   x: point.x - size.width / 2,
