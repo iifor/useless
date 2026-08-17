@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { Point } from "./windowMotion";
 
 export type SeatKind = "file" | "folder" | "owned-temp" | "window" | "virtual";
+export type SeatSearchMode = "auto" | "focused-window" | "desktop-icon";
 
 export interface SeatAnchor extends Point {}
 
@@ -19,11 +20,11 @@ export interface DesktopSeatTarget {
 }
 
 export interface DesktopItemProvider {
-  findSeatCandidates(): Promise<DesktopSeatTarget[]>;
+  findSeatCandidates(mode: SeatSearchMode): Promise<DesktopSeatTarget[]>;
 }
 
 const desktopItemProvider: DesktopItemProvider = {
-  findSeatCandidates: () => invoke("find_seat_targets"),
+  findSeatCandidates: (mode) => invoke("find_seat_targets", { mode }),
 };
 
 const VIRTUAL_SEAT: DesktopSeatTarget = {
@@ -46,12 +47,17 @@ const PENDING_OWNED_SEAT: DesktopSeatTarget = {
 
 export function chooseSeatTarget(
   candidates: DesktopSeatTarget[],
+  mode: SeatSearchMode,
   random = Math.random,
-): DesktopSeatTarget {
-  const focused = candidates.find(({ kind, focused }) => kind === "window" && focused);
-  if (focused) return focused;
+): DesktopSeatTarget | null {
+  if (mode === "focused-window") {
+    const windows = candidates.filter(({ kind }) => kind === "window");
+    return windows[Math.floor(random() * windows.length)] ?? null;
+  }
   const icons = candidates.filter(({ kind }) => kind !== "window");
-  return icons[Math.floor(random() * icons.length)] ?? PENDING_OWNED_SEAT;
+  if (mode === "desktop-icon") return icons[Math.floor(random() * icons.length)] ?? null;
+  const focused = candidates.find(({ kind, focused }) => kind === "window" && focused);
+  return focused ?? icons[Math.floor(random() * icons.length)] ?? PENDING_OWNED_SEAT;
 }
 
 export const isPendingOwnedSeat = (target: DesktopSeatTarget): boolean =>
@@ -70,22 +76,26 @@ export const seatTargetChanged = (
   || Math.abs(refreshed.seatAnchor.y - original.seatAnchor.y) > 0.5
 );
 
-export async function findSeatTarget(random = Math.random): Promise<DesktopSeatTarget> {
-  if (!("__TAURI_INTERNALS__" in window)) return VIRTUAL_SEAT;
+export async function findSeatTarget(
+  mode: SeatSearchMode = "auto",
+  random = Math.random,
+): Promise<DesktopSeatTarget | null> {
+  if (!("__TAURI_INTERNALS__" in window)) return mode === "auto" ? VIRTUAL_SEAT : null;
   let candidates: DesktopSeatTarget[] = [];
   try {
-    candidates = await desktopItemProvider.findSeatCandidates();
-    return chooseSeatTarget(candidates, random);
+    candidates = await desktopItemProvider.findSeatCandidates(mode);
+    return chooseSeatTarget(candidates, mode, random);
   } catch (error) {
-    console.warn("桌面座位已降级为虚拟目标", error);
-    return VIRTUAL_SEAT;
+    console.warn("桌面座位查找失败", error);
+    return mode === "auto" ? VIRTUAL_SEAT : null;
   }
 }
 
 export async function materializeOwnedSeatTarget(
   target: DesktopSeatTarget,
   create: () => Promise<DesktopSeatTarget> = () => invoke("create_owned_seat_file"),
-  find: () => Promise<DesktopSeatTarget[]> = desktopItemProvider.findSeatCandidates,
+  find: () => Promise<DesktopSeatTarget[]> = () =>
+    desktopItemProvider.findSeatCandidates("desktop-icon"),
   sleep: (milliseconds: number) => Promise<void> = (milliseconds) =>
     new Promise((resolve) => window.setTimeout(resolve, milliseconds)),
 ): Promise<DesktopSeatTarget> {

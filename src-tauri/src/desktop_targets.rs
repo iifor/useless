@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf};
 use tauri::{AppHandle, Manager};
 
@@ -155,6 +155,14 @@ struct TargetContext {
     scale_factor: f64,
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "kebab-case")]
+pub enum SeatSearchMode {
+    Auto,
+    FocusedWindow,
+    DesktopIcon,
+}
+
 fn target_context(app: &AppHandle) -> Result<TargetContext, String> {
     let window = app
         .get_webview_window("main")
@@ -177,7 +185,10 @@ fn target_context(app: &AppHandle) -> Result<TargetContext, String> {
 }
 
 #[tauri::command]
-pub async fn find_seat_targets(app: AppHandle) -> Result<Vec<DesktopSeatTarget>, String> {
+pub async fn find_seat_targets(
+    app: AppHandle,
+    mode: SeatSearchMode,
+) -> Result<Vec<DesktopSeatTarget>, String> {
     let context = target_context(&app)?;
     let windows = platform_windows(&context)?;
     let visible_windows = visible_window_targets(
@@ -186,8 +197,11 @@ pub async fn find_seat_targets(app: AppHandle) -> Result<Vec<DesktopSeatTarget>,
         std::process::id(),
         context.pet_height,
     );
-    if let Some(target) = focused_window_target(&visible_windows) {
+    if let Some(target) = window_target_for_mode(&visible_windows, mode) {
         return Ok(vec![DesktopSeatTarget::window(target)]);
+    }
+    if mode == SeatSearchMode::FocusedWindow {
+        return Ok(Vec::new());
     }
     let occluders: Vec<_> = windows
         .iter()
@@ -312,6 +326,18 @@ fn visible_window_targets(
 
 fn focused_window_target(windows: &[WindowTarget]) -> Option<WindowTarget> {
     windows.iter().find(|window| window.focused).cloned()
+}
+
+fn window_target_for_mode(
+    windows: &[WindowTarget],
+    mode: SeatSearchMode,
+) -> Option<WindowTarget> {
+    match mode {
+        SeatSearchMode::Auto => focused_window_target(windows),
+        SeatSearchMode::FocusedWindow => focused_window_target(windows)
+            .or_else(|| windows.first().cloned()),
+        SeatSearchMode::DesktopIcon => None,
+    }
 }
 
 fn icon_is_occluded(icon: Rect, windows: &[Rect]) -> bool {
@@ -659,6 +685,23 @@ mod tests {
     use super::*;
 
     #[test]
+    fn parses_seat_search_modes_and_rejects_unknown_modes() {
+        assert_eq!(
+            serde_json::from_str::<SeatSearchMode>(r#""auto""#).unwrap(),
+            SeatSearchMode::Auto
+        );
+        assert_eq!(
+            serde_json::from_str::<SeatSearchMode>(r#""focused-window""#).unwrap(),
+            SeatSearchMode::FocusedWindow
+        );
+        assert_eq!(
+            serde_json::from_str::<SeatSearchMode>(r#""desktop-icon""#).unwrap(),
+            SeatSearchMode::DesktopIcon
+        );
+        assert!(serde_json::from_str::<SeatSearchMode>(r#""unknown""#).is_err());
+    }
+
+    #[test]
     fn parses_finder_positions_and_rejects_malformed_rows() {
         let items = parse_finder_items("/Users/me/Desktop/a.txt\t100\t200\t64\t64\ninvalid");
         assert_eq!(items.len(), 1);
@@ -728,6 +771,24 @@ mod tests {
         let targets = visible_window_targets(vec![own, background], work_area, 100, 200.0);
 
         assert!(focused_window_target(&targets).is_none());
+    }
+
+    #[test]
+    fn manual_current_window_uses_the_topmost_external_window_after_the_pet_takes_focus() {
+        let windows = vec![WindowTarget {
+            native_id: "8".into(),
+            name: "Work".into(),
+            anchor: Point { x: 600.0, y: 300.0 },
+            focused: false,
+        }];
+
+        assert_eq!(
+            window_target_for_mode(&windows, SeatSearchMode::FocusedWindow)
+                .unwrap()
+                .native_id,
+            "8"
+        );
+        assert!(window_target_for_mode(&windows, SeatSearchMode::Auto).is_none());
     }
 
     #[test]

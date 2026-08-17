@@ -15,15 +15,23 @@ const icon = target("file", "file");
 const windowSeat = target("window", "window");
 
 describe("desktop seat selection", () => {
-  test("prefers the focused window, then an icon, then a deferred owned seat", () => {
+  test("keeps the automatic focused-window, icon, and deferred-owned priority", () => {
     const focused = { ...windowSeat, id: "focused", focused: true };
-    expect(chooseSeatTarget([icon, windowSeat, focused], values(0.5, 0.9, 0))).toEqual(focused);
-    expect(chooseSeatTarget([icon, windowSeat], values(0.5, 0.9, 0))).toEqual(icon);
-    expect(isPendingOwnedSeat(chooseSeatTarget([], values(0)))).toBe(true);
+    expect(chooseSeatTarget([icon, windowSeat, focused], "auto", values(0.5))).toEqual(focused);
+    expect(chooseSeatTarget([icon, windowSeat], "auto", values(0.5))).toEqual(icon);
+    expect(isPendingOwnedSeat(chooseSeatTarget([], "auto", values(0))!)).toBe(true);
+  });
+
+  test("keeps explicit window and desktop-icon searches isolated", () => {
+    const focused = { ...windowSeat, id: "focused", focused: true };
+    expect(chooseSeatTarget([icon, focused], "focused-window", values(0))).toEqual(focused);
+    expect(chooseSeatTarget([icon, focused], "desktop-icon", values(0))).toEqual(icon);
+    expect(chooseSeatTarget([], "focused-window", values(0))).toBeNull();
+    expect(chooseSeatTarget([], "desktop-icon", values(0))).toBeNull();
   });
 
   test("creates an owned seat only after arrival and never after a failed arrival", async () => {
-    const pending = chooseSeatTarget([], values(0));
+    const pending = chooseSeatTarget([], "auto", values(0))!;
     const events: string[] = [];
     const materialize = (target: DesktopSeatTarget) => materializeOwnedSeatTarget(
       target,
