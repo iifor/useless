@@ -63,7 +63,9 @@ export function poseForAction(action: PetAction, direction: Direction): PetPose 
     case PetAction.IDLE_PRONE: return "idle-prone";
     case PetAction.IDLE_LIE: return "idle-lie";
     case PetAction.WALK_SLOW: return direction === "left" ? "walk-slow-left" : "walk-slow-right";
-    case PetAction.SEARCH_SEAT: return "search-seat";
+    case PetAction.SEARCH_SEAT:
+    case PetAction.SEARCH_CURRENT_WINDOW:
+    case PetAction.SEARCH_DESKTOP_ICON: return "search-seat";
     case PetAction.SEAT_ON_ITEM: return "seat-on-item";
     case PetAction.LOOK_AT_FILE:
     case PetAction.ASK_CONFIRM: return "idle-stand";

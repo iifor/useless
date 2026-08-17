@@ -28,9 +28,11 @@ import {
   materializeOwnedSeatTarget,
   refreshWindowSeat,
   releaseSeatTarget,
+  seatSearchModeForAction,
   seatTargetChanged,
   shouldRenderSeatMarker,
   type DesktopSeatTarget,
+  type SeatSearchMode,
 } from "./pet/desktopSeat";
 import PetRenderer from "./pet/PetRenderer";
 import { SeatIcon } from "./pet/SeatIcon";
@@ -127,13 +129,13 @@ export default function App() {
       });
     };
 
-    const seatSequence = async () => {
+    const seatSequence = async (mode: SeatSearchMode = "auto") => {
       let target: DesktopSeatTarget | null = null;
       try {
         if (isCurrent()) setAction(PetAction.SEARCH_SEAT);
         await delay(actionDurationMs(PetAction.SEARCH_SEAT), signal);
-        target = await findSeatTarget();
-        if (!isCurrent()) return;
+        target = await findSeatTarget(mode);
+        if (!target || !isCurrent()) return;
         setAction(PetAction.WALK_SLOW);
         await waitForPetWindowLayout();
         if (!isCurrent()) return;
@@ -210,8 +212,9 @@ export default function App() {
           await walk();
           if (isCurrent()) setAction(PetAction.IDLE_STAND);
         }
-        if (manual === PetAction.SEARCH_SEAT) {
-          await seatSequence();
+        const seatMode = seatSearchModeForAction(manual);
+        if (seatMode) {
+          await seatSequence(seatMode);
           if (isCurrent()) setAction(PetAction.IDLE_STAND);
         }
         if (manual === PetAction.SEAT_ON_ITEM) setSeat({

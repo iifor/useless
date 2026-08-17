@@ -107,6 +107,8 @@ describe("action scheduling", () => {
 
   test("uses a dedicated four-frame animation while searching for a seat", () => {
     expect(poseForAction(PetAction.SEARCH_SEAT, "right")).toBe("search-seat");
+    expect(poseForAction(PetAction.SEARCH_CURRENT_WINDOW, "right")).toBe("search-seat");
+    expect(poseForAction(PetAction.SEARCH_DESKTOP_ICON, "right")).toBe("search-seat");
     expect(ANIMATIONS["search-seat"].frameCount).toBe(4);
   });
 });

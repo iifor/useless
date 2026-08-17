@@ -5,10 +5,12 @@ import {
   chooseSeatTarget,
   isPendingOwnedSeat,
   materializeOwnedSeatTarget,
+  seatSearchModeForAction,
   seatTargetChanged,
   shouldRenderSeatMarker,
   type DesktopSeatTarget,
 } from "../../src/pet/desktopSeat";
+import { PetAction } from "../../src/pet/actions";
 import { windowPositionForSeatAnchor } from "../../src/pet/windowMotion";
 
 const icon = target("file", "file");
@@ -28,6 +30,13 @@ describe("desktop seat selection", () => {
     expect(chooseSeatTarget([icon, focused], "desktop-icon", values(0))).toEqual(icon);
     expect(chooseSeatTarget([], "focused-window", values(0))).toBeNull();
     expect(chooseSeatTarget([], "desktop-icon", values(0))).toBeNull();
+  });
+
+  test("maps each seat action to its matching provider mode", () => {
+    expect(seatSearchModeForAction(PetAction.SEARCH_SEAT)).toBe("auto");
+    expect(seatSearchModeForAction(PetAction.SEARCH_CURRENT_WINDOW)).toBe("focused-window");
+    expect(seatSearchModeForAction(PetAction.SEARCH_DESKTOP_ICON)).toBe("desktop-icon");
+    expect(seatSearchModeForAction(PetAction.IDLE_STAND)).toBeNull();
   });
 
   test("creates an owned seat only after arrival and never after a failed arrival", async () => {

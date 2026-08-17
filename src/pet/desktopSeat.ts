@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 
+import { PetAction } from "./actions";
 import type { Point } from "./windowMotion";
 
 export type SeatKind = "file" | "folder" | "owned-temp" | "window" | "virtual";
@@ -62,6 +63,13 @@ export function chooseSeatTarget(
 
 export const isPendingOwnedSeat = (target: DesktopSeatTarget): boolean =>
   target.kind === "owned-temp" && target.appOwned && !target.path;
+
+export function seatSearchModeForAction(action: PetAction): SeatSearchMode | null {
+  if (action === PetAction.SEARCH_SEAT) return "auto";
+  if (action === PetAction.SEARCH_CURRENT_WINDOW) return "focused-window";
+  if (action === PetAction.SEARCH_DESKTOP_ICON) return "desktop-icon";
+  return null;
+}
 
 export const shouldRenderSeatMarker = (target: DesktopSeatTarget | null): boolean =>
   target?.virtualMarker === true;

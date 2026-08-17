@@ -8,6 +8,8 @@ export const MANUAL_ACTIONS = [
   PetAction.IDLE_LIE,
   PetAction.WALK_SLOW,
   PetAction.SEARCH_SEAT,
+  PetAction.SEARCH_CURRENT_WINDOW,
+  PetAction.SEARCH_DESKTOP_ICON,
   PetAction.SEAT_ON_ITEM,
 ] as const;
 
@@ -20,6 +22,8 @@ const MANUAL_ACTION_LABELS: Record<ManualAction, string> = {
   [PetAction.IDLE_LIE]: "侧躺",
   [PetAction.WALK_SLOW]: "慢慢走",
   [PetAction.SEARCH_SEAT]: "寻找桌面座位",
+  [PetAction.SEARCH_CURRENT_WINDOW]: "坐到当前窗口",
+  [PetAction.SEARCH_DESKTOP_ICON]: "寻找桌面图标",
   [PetAction.SEAT_ON_ITEM]: "坐在图标上",
 };
 

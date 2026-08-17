@@ -20,6 +20,14 @@ test("offers automatic mode and every manual action", () => {
   expect(ACTION_MENU_ITEMS.map((item) => item.value)).not.toContain(PetAction.LOOK_AT_FILE);
   expect(ACTION_MENU_ITEMS.map((item) => item.value)).not.toContain(PetAction.ASK_CONFIRM);
   expect(ACTION_MENU_ITEMS.map((item) => item.value)).not.toContain(PetAction.EAT_NORMAL);
+  expect(ACTION_MENU_ITEMS).toContainEqual({
+    value: PetAction.SEARCH_CURRENT_WINDOW,
+    label: "坐到当前窗口",
+  });
+  expect(ACTION_MENU_ITEMS).toContainEqual({
+    value: PetAction.SEARCH_DESKTOP_ICON,
+    label: "寻找桌面图标",
+  });
 });
 
 test("groups actions and food under nested root menu items", () => {
