@@ -1,9 +1,12 @@
-import { PetAction } from "./actions";
+import { PetAction, isActionSupported } from "./actions";
+import type { CharacterManifest } from "./characterManifest";
 import type { Point, Size } from "./windowMotion";
 
 export const MANUAL_ACTIONS = [
   PetAction.IDLE_STAND,
   PetAction.IDLE_SIT,
+  PetAction.IDLE_PRONE,
+  PetAction.IDLE_LIE,
   PetAction.WALK_SLOW,
   PetAction.SEARCH_SEAT,
   PetAction.SEARCH_CURRENT_WINDOW,
@@ -16,6 +19,8 @@ export type ManualAction = typeof MANUAL_ACTIONS[number];
 const MANUAL_ACTION_LABELS: Record<ManualAction, string> = {
   [PetAction.IDLE_STAND]: "站着",
   [PetAction.IDLE_SIT]: "坐着",
+  [PetAction.IDLE_PRONE]: "趴着",
+  [PetAction.IDLE_LIE]: "侧躺",
   [PetAction.WALK_SLOW]: "慢慢走",
   [PetAction.SEARCH_SEAT]: "寻找桌面座位",
   [PetAction.SEARCH_CURRENT_WINDOW]: "坐到当前窗口",
@@ -23,23 +28,37 @@ const MANUAL_ACTION_LABELS: Record<ManualAction, string> = {
   [PetAction.SEAT_ON_ITEM]: "坐在图标上",
 };
 
-export const ACTION_MENU_ITEMS = [
-  { value: "AUTO", label: "自动模式" },
-  ...MANUAL_ACTIONS.map((value) => ({ value, label: MANUAL_ACTION_LABELS[value] })),
-] as const;
+export type ActionMenuValue = "AUTO" | ManualAction;
 
-export const ROOT_MENU_ITEMS = [
+export interface ActionMenuItem {
+  value: ActionMenuValue;
+  label: string;
+}
+
+export const actionMenuItemsFor = (character: CharacterManifest): ActionMenuItem[] => [
+  { value: "AUTO", label: "自动模式" },
+  ...MANUAL_ACTIONS
+    .filter((action) => isActionSupported(character, action))
+    .map((value) => ({ value, label: MANUAL_ACTION_LABELS[value] })),
+];
+
+const ROOT_MENU_ITEMS = [
   { id: "actions", label: "动作" },
   { id: "files", label: "文件" },
   { id: "capabilities", label: "宠物能力" },
 ] as const;
+
+export type RootMenuItem = typeof ROOT_MENU_ITEMS[number];
+
+export const rootMenuItemsFor = (character: CharacterManifest): RootMenuItem[] =>
+  ROOT_MENU_ITEMS.filter((item) => item.id !== "files"
+    || character.capabilities.includes("file-eating"));
 
 export const FILE_MENU_ITEMS = [
   { value: "file", label: "吃文件…" },
   { value: "folder", label: "吃文件夹…" },
 ] as const;
 
-export type ActionMenuValue = typeof ACTION_MENU_ITEMS[number]["value"];
 export type FoodPickerKind = typeof FILE_MENU_ITEMS[number]["value"];
 
 export function submenuSide(

@@ -13,8 +13,10 @@ import {
 import {
   ANIMATIONS,
   PET_POSES,
+  availablePoses,
   contentLongEdgeForPose,
 } from "../../src/pet/animations";
+import { fullCharacter, reducedCharacter } from "./characterFixtures";
 
 describe("frame coordinates", () => {
   test("maps an atlas cell to its source rectangle", () => {
@@ -109,12 +111,14 @@ test("uses one shared visible size for every pet pose", () => {
   expect(new Set(PET_POSES.map(contentLongEdgeForPose))).toEqual(new Set([119]));
 });
 
-test("does not include prone, lying, or sleeping poses", () => {
-  expect(PET_POSES).not.toEqual(expect.arrayContaining([
-    "idle-prone",
-    "idle-lie",
-    "sleep-side",
+test("keeps prone and lying in the superset but filters them for reduced characters", () => {
+  expect(availablePoses(fullCharacter)).toEqual(expect.arrayContaining([
+    "idle-prone", "idle-lie",
   ]));
+  expect(availablePoses(reducedCharacter)).not.toEqual(expect.arrayContaining([
+    "idle-prone", "idle-lie", "sleep-side",
+  ]));
+  expect(PET_POSES).not.toContain("sleep-side");
 });
 
 test("crops an animation to the aligned alpha union plus eight pixels of padding", () => {

@@ -1,4 +1,5 @@
-import { PetAction } from "./actions";
+import { PetAction, isActionSupported } from "./actions";
+import type { CharacterManifest } from "./characterManifest";
 import type { ReactNode } from "react";
 import {
   advanceToConfirmation,
@@ -83,10 +84,15 @@ export default function FoodInteraction(
 }
 
 export async function runFoodSelection(
+  character: CharacterManifest,
   kind: FoodPickerKind,
   flowRef: FoodFlowRef,
   effects: FoodSelectionEffects,
 ): Promise<void> {
+  if (!isActionSupported(character, PetAction.LOOK_AT_FILE)) {
+    effects.finish();
+    return;
+  }
   let target: FoodTarget | null;
   try {
     target = await effects.pick(kind);
@@ -114,10 +120,15 @@ export async function runFoodSelection(
 }
 
 export async function runFoodDecision(
+  character: CharacterManifest,
   decision: "confirm" | "cancel",
   flowRef: FoodFlowRef,
   effects: FoodDecisionEffects,
 ): Promise<void> {
+  if (!isActionSupported(character, PetAction.EAT_NORMAL)) {
+    effects.finish();
+    return;
+  }
   const flow = flowRef.current;
   if (flow.stage !== "confirming") return;
 

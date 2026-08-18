@@ -21,6 +21,7 @@ const CONTENT_PADDING = 8;
 const DEFAULT_VIEWPORT_SIZE = 216;
 
 export interface PetRendererProps {
+  displayName: string;
   pose: PetPose;
   scale: number;
   onDragStart?: () => void;
@@ -31,6 +32,7 @@ export interface PetRendererProps {
 }
 
 export default function PetRenderer({
+  displayName,
   pose,
   scale,
   onDragStart,
@@ -189,7 +191,7 @@ export default function PetRenderer({
 
   return (
     <canvas
-      aria-label="UNO Yan"
+      aria-label={displayName}
       className="pet-canvas"
       height={DEFAULT_VIEWPORT_SIZE}
       onContextMenu={openContextMenu}

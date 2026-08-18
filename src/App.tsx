@@ -6,11 +6,13 @@ import {
   dragResumeAction,
   foodResumeAction,
   nextAction,
+  isActionSupported,
   shouldClearSeatAfterAction,
   shouldResumeAfterDrag,
   type Direction,
 } from "./pet/actions";
 import { poseForAction } from "./pet/animations";
+import { PET_CHARACTER } from "./pet/character";
 import FoodInteraction, {
   beginFoodActivity,
   endFoodActivity,
@@ -20,7 +22,12 @@ import FoodInteraction, {
 import { finishFood, type FoodFlow } from "./pet/foodFlow";
 import { pickFood, trashFood, type FoodPickerKind } from "./pet/foodPicker";
 import PetActionMenu from "./pet/PetActionMenu";
-import type { ActionMenuValue, ManualAction } from "./pet/actionMenu";
+import {
+  actionMenuItemsFor,
+  rootMenuItemsFor,
+  type ActionMenuValue,
+  type ManualAction,
+} from "./pet/actionMenu";
 import {
   arriveThenMaterializeSeat,
   findSeatTarget,
@@ -60,6 +67,9 @@ import {
 const waitForFood = (milliseconds: number) =>
   new Promise<void>((resolve) => window.setTimeout(resolve, milliseconds));
 
+const actionMenuItems = actionMenuItemsFor(PET_CHARACTER);
+const rootMenuItems = rootMenuItemsFor(PET_CHARACTER);
+
 export default function App() {
   const [action, setAction] = useState(PetAction.IDLE_STAND);
   const [direction, setDirection] = useState<Direction>("right");
@@ -97,6 +107,7 @@ export default function App() {
     };
 
     const seatSequence = async (searchAction: PetAction = PetAction.SEARCH_SEAT) => {
+      if (!isActionSupported(PET_CHARACTER, searchAction)) return;
       const mode: SeatSearchMode | null = seatSearchModeForAction(searchAction);
       if (!mode) return;
       let target: DesktopSeatTarget | null = null;
@@ -207,7 +218,7 @@ export default function App() {
             await delay(actionDurationMs(current), signal);
             if (isCurrent() && shouldClearSeatAfterAction(automatic, current)) setSeat(null);
           }
-          current = nextAction(current);
+          current = nextAction(PET_CHARACTER, current);
         } catch (error) {
           if (signal.aborted) throw error;
           console.error("宠物动作失败，恢复站立后继续调度", error);
@@ -261,6 +272,7 @@ export default function App() {
 
   const selectMode = (value: ActionMenuValue) => {
     if (foodActive.current) return;
+    if (value !== "AUTO" && !isActionSupported(PET_CHARACTER, value)) return;
     menuRequest.current += 1;
     setMenuPoint(null);
     active.current?.abort();
@@ -304,6 +316,7 @@ export default function App() {
   };
 
   const chooseFood = async (kind: FoodPickerKind): Promise<void> => {
+    if (!isActionSupported(PET_CHARACTER, PetAction.LOOK_AT_FILE)) return;
     if (!beginFoodActivity(foodActive)) return Promise.resolve();
     menuRequest.current += 1;
     dragResume.current = null;
@@ -312,11 +325,17 @@ export default function App() {
     void hideSeatTargetBubble();
     setSeat(null);
     await applyWindowMode("compact");
-    return runFoodSelection(kind, foodFlowRef, { ...foodEffects, pick: pickFood });
+    return runFoodSelection(PET_CHARACTER, kind, foodFlowRef, {
+      ...foodEffects,
+      pick: pickFood,
+    });
   };
 
   const decideFood = (decision: "confirm" | "cancel") => {
-    void runFoodDecision(decision, foodFlowRef, { ...foodEffects, trash: trashFood });
+    void runFoodDecision(PET_CHARACTER, decision, foodFlowRef, {
+      ...foodEffects,
+      trash: trashFood,
+    });
   };
 
   const dragStart = () => {
@@ -340,6 +359,7 @@ export default function App() {
       <div className="pet-stage">
         {shouldRenderSeatMarker(seat) && seat && <SeatIcon kind={seat.kind} />}
         <PetRenderer
+          displayName={PET_CHARACTER.displayName}
           dragDisabled={windowMode === "interaction" || foodActive.current}
           onBodyContextMenu={openMenu}
           onDragEnd={dragEnd}
@@ -348,7 +368,7 @@ export default function App() {
             compactSize.current = size;
             return setPetWindowLayout(size, windowModeRef.current);
           }}
-          pose={poseForAction(action, direction)}
+          pose={poseForAction(PET_CHARACTER, action, direction)}
           scale={1}
         />
         <FoodInteraction
@@ -359,11 +379,14 @@ export default function App() {
       </div>
       {menuPoint && (
         <PetActionMenu
+          actionItems={actionMenuItems}
+          displayName={PET_CHARACTER.displayName}
           onClose={closeMenu}
           onChooseFood={chooseFood}
           onSelect={selectMode}
           point={fromBottomCenter(menuPoint, INTERACTION_WINDOW_SIZE)}
           selection={automatic ? "AUTO" : manual}
+          rootItems={rootMenuItems}
         />
       )}
     </main>

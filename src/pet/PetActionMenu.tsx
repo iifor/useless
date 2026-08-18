@@ -1,12 +1,12 @@
 import { useEffect, useState, type PointerEvent } from "react";
 
 import {
-  ACTION_MENU_ITEMS,
+  type ActionMenuItem,
   clampMenuPosition,
   type ActionMenuValue,
   FILE_MENU_ITEMS,
   type FoodPickerKind,
-  ROOT_MENU_ITEMS,
+  type RootMenuItem,
   submenuPlacement,
   submenuTop,
 } from "./actionMenu";
@@ -20,11 +20,14 @@ const MENU_CHROME_HEIGHT = 14;
 const SUBMENU_MAX_HEIGHT = 304;
 
 interface PetActionMenuProps {
+  actionItems: ActionMenuItem[];
+  displayName: string;
   point: Point;
   selection: ActionMenuValue;
   onSelect: (value: ActionMenuValue) => void;
   onChooseFood: (kind: FoodPickerKind) => void | Promise<void>;
   onClose: () => void;
+  rootItems: RootMenuItem[];
 }
 
 export const runMenuChoice = (
@@ -32,11 +35,14 @@ export const runMenuChoice = (
 ): Promise<void> => Promise.resolve().then(choose).catch((error) => console.error(error));
 
 export default function PetActionMenu({
+  actionItems,
+  displayName,
   point,
   selection,
   onSelect,
   onChooseFood,
   onClose,
+  rootItems,
 }: PetActionMenuProps) {
   const position = clampMenuPosition(point, MENU_SIZE, WINDOW_SIZE, 8);
   const [openSubmenu, setOpenSubmenu] = useState<
@@ -57,6 +63,7 @@ export default function PetActionMenu({
     WINDOW_SIZE.height,
     8,
   );
+  const rootIndex = (id: RootMenuItem["id"]) => rootItems.findIndex((item) => item.id === id);
 
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -70,14 +77,14 @@ export default function PetActionMenu({
 
   return (
     <nav
-      aria-label="宠物动作"
+      aria-label={`${displayName} 动作菜单`}
       className="action-menu"
       onContextMenu={(event) => event.preventDefault()}
       onPointerDown={keepOpen}
       role="menu"
       style={{ left: submenu.rootX, top: position.y }}
     >
-      {ROOT_MENU_ITEMS.map((item) => (
+      {rootItems.map((item) => (
         <button
           className="action-menu-item"
           key={item.id}
@@ -94,9 +101,9 @@ export default function PetActionMenu({
           className="action-menu action-submenu"
           data-side={submenu.side}
           role="menu"
-          style={{ top: topFor(0, ACTION_MENU_ITEMS.length) }}
+          style={{ top: topFor(rootIndex("actions"), actionItems.length) }}
         >
-          {ACTION_MENU_ITEMS.map((item) => (
+          {actionItems.map((item) => (
             <button
               aria-checked={selection === item.value}
               className="action-menu-item"
@@ -115,7 +122,7 @@ export default function PetActionMenu({
           className="action-menu action-submenu"
           data-side={submenu.side}
           role="menu"
-          style={{ top: topFor(1, FILE_MENU_ITEMS.length) }}
+          style={{ top: topFor(rootIndex("files"), FILE_MENU_ITEMS.length) }}
         >
           {FILE_MENU_ITEMS.map((item) => (
             <button
@@ -135,7 +142,7 @@ export default function PetActionMenu({
           className="action-menu action-submenu"
           data-side={submenu.side}
           role="menu"
-          style={{ top: topFor(2, 1) }}
+          style={{ top: topFor(rootIndex("capabilities"), 1) }}
         >
           <button className="action-menu-item" disabled role="menuitem" type="button">
             暂无能力
