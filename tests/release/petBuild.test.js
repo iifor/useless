@@ -5,8 +5,6 @@ import { join } from "node:path";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import {
-  expectedWindowsArtifacts,
-  loadCharacter,
   prepareCharacterBuild,
   runPetCommand,
 } from "../../scripts/pet-build.mjs";
@@ -101,6 +99,8 @@ describe("character-selected build", () => {
       prepared.iconPaths.ico,
     ]);
     expect(config.bundle.macOS.infoPlist).toBe(prepared.infoPlistPath);
+    expect(config.bundle).not.toHaveProperty("targets");
+    expect(config).not.toHaveProperty("build");
     expect(info).toContain(`${displayName} 仅在寻找桌面座位时读取 Finder 中桌面图标的位置。`);
     expect(JSON.stringify(config)).not.toMatch(/updater|releases\/latest/i);
   });
@@ -125,11 +125,18 @@ describe("character-selected build", () => {
     );
   });
 
-  test("derives Windows artifact names from the role product", async () => {
-    expect(expectedWindowsArtifacts(await loadCharacter(process.cwd(), "uno-pangyu"))).toEqual({
-      application: "UNO PangYu.exe",
-      installer: "UNO PangYu_0.1.0_x64-setup.exe",
+  test("provides Windows NSIS identity through Tauri without a custom publisher", async () => {
+    const root = await tempProject();
+    const prepared = await prepareCharacterBuild(root, "uno-pangyu");
+    const config = JSON.parse(await readFile(prepared.tauriConfigPath, "utf8"));
+    expect(config).toMatchObject({
+      productName: "UNO PangYu",
+      version: "0.1.0",
+      identifier: "com.iifor.uno-pangyu",
+      bundle: { icon: Object.values(prepared.iconPaths) },
     });
+    await expect(readFile("scripts/build-windows.mjs", "utf8"))
+      .rejects.toMatchObject({ code: "ENOENT" });
   });
 
   test("exposes only the selected-character commands and keeps engine code role-neutral", async () => {

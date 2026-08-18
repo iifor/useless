@@ -43,12 +43,10 @@ export async function prepareCharacterBuild(root, id) {
   await writeFile(infoPlistPath, infoPlist(manifest.displayName));
   const base = JSON.parse(await readFile(join(root, "src-tauri", "tauri.conf.json"), "utf8"));
   await writeFile(tauriConfigPath, `${JSON.stringify({
-    ...base,
     productName: manifest.displayName,
     version: manifest.version,
     identifier: manifest.bundleId,
     app: {
-      ...base.app,
       windows: base.app.windows.map((window) => ({
         ...window,
         title: window.label === "seat-target"
@@ -57,9 +55,8 @@ export async function prepareCharacterBuild(root, id) {
       })),
     },
     bundle: {
-      ...base.bundle,
       icon: Object.values(iconPaths),
-      macOS: { ...base.bundle.macOS, infoPlist: infoPlistPath },
+      macOS: { infoPlist: infoPlistPath },
     },
   }, null, 2)}\n`);
 
@@ -72,13 +69,6 @@ export async function stageCharacterPublic(root, id) {
   await rm(publicDir, { recursive: true, force: true });
   await copyPet(join(root, "characters", id), publicDir);
   return { manifest, stageDir, publicDir };
-}
-
-export function expectedWindowsArtifacts(manifest) {
-  return {
-    application: `${manifest.displayName}.exe`,
-    installer: `${manifest.displayName}_${manifest.version}_x64-setup.exe`,
-  };
 }
 
 export async function runPetCommand({ root = projectRoot, mode, args, spawn = spawnInherited } = {}) {

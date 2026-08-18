@@ -96,11 +96,7 @@ pub fn claim_instance_slot(_identifier: &str) -> usize {
 
 #[cfg(any(windows, test))]
 pub fn mutex_prefix(identifier: &str) -> String {
-    let safe: String = identifier
-        .chars()
-        .map(|character| if character.is_ascii_alphanumeric() { character } else { '-' })
-        .collect();
-    format!(r"Local\Pet-{safe}-Slot")
+    format!(r"Local\Pet-{identifier}-Slot")
 }
 
 pub fn position_main_window(app: &tauri::AppHandle) -> Result<(), String> {
@@ -161,10 +157,10 @@ mod tests {
 
     #[test]
     fn mutex_prefixes_are_deterministic_and_distinct_per_bundle() {
-        assert_eq!(mutex_prefix("com.example.pet-one"), r"Local\Pet-com-example-pet-one-Slot");
+        assert_eq!(mutex_prefix("com.example.pet-one"), r"Local\Pet-com.example.pet-one-Slot");
         assert_ne!(
             mutex_prefix("com.example.pet-one"),
-            mutex_prefix("com.example.pet-two"),
+            mutex_prefix("com.example.pet.one"),
         );
     }
 }
