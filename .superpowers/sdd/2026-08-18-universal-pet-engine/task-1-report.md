@@ -134,3 +134,54 @@ Result: 25 tests passed. The new path regression rejects flat strips and accepts
 
 - `7ee4e12 fix: nest character animation strips`
 - This appended fix evidence is committed separately.
+
+## Fix round 3 — Character descriptor filename
+
+The descriptor contract is `characters/<id>/character.json`; `manifest.json` is not a valid substitute.
+
+### Assertion RED evidence
+
+Command: `pnpm vitest run tests/pet/characterPackage.test.js -t "requires character.json instead of manifest.json"`
+
+Exit: `1`
+
+Relevant output:
+
+```text
+× character packages > requires character.json instead of manifest.json
+  → expected [] to deeply equal ArrayContaining{…}
+
+- ArrayContaining [
+-   StringContaining "characters/manifest-only/character.json: missing or invalid JSON",
+- ]
++ []
+
+Test Files  1 failed (1)
+Tests  1 failed | 25 skipped (26)
+EXIT_CODE=1
+```
+
+The manifest-only package was accepted before the change, which is the intended regression signal.
+
+### GREEN evidence
+
+Command: `pnpm vitest run tests/pet/characterPackage.test.js`
+
+Exit: `0`
+
+Result: 26 tests passed. A package with only `manifest.json` now fails and the matching `character.json` package succeeds.
+
+### Fix-round verification
+
+- `pnpm test` — 128 passed, 2 skipped.
+- `pnpm build` — passed.
+
+### Fix-round changes
+
+- `tests/pet/characterPackage.test.js` — `character.json` fixtures/assertions and descriptor-name regression coverage.
+- `scripts/pet-validate.mjs` — requires `character.json`.
+
+### Fix-round commit
+
+- `3b9db7f fix: require character package descriptor`
+- This appended fix evidence is committed separately.
