@@ -1,4 +1,4 @@
-# UNO PangYu
+# UNO Yan
 
 独立的汉服桌面宠物，可与 UNO 同时安装和运行。
 
@@ -32,6 +32,6 @@ Windows x64：
 pnpm build:windows
 ```
 
-Windows 产物为 `release/UNO-PangYu.exe` 和 `release/UNO-PangYu-Setup.exe`。
+Windows 产物为 `release/UNO-Yan.exe` 和 `release/UNO-Yan-Setup.exe`。
 
 第一版不包含自动更新或自动发布流程。

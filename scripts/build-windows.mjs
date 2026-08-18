@@ -109,7 +109,7 @@ export async function snapshotInstallerCandidates(
 
 export async function resolveBuildArtifacts(root = projectRoot, installersBeforeBuild) {
   const releaseRoot = join(root, "src-tauri", "target", WINDOWS_TARGET, "release");
-  const application = join(releaseRoot, "uno-pangyu.exe");
+  const application = join(releaseRoot, "uno-yan.exe");
   try {
     if ((await stat(application)).size <= 0) throw new Error();
   } catch {
@@ -180,8 +180,8 @@ export async function publishArtifacts({ application, installer, releaseDirector
   await fileSystem.mkdir(releaseDirectory, { recursive: true });
   const publicationId = `${process.pid}-${Date.now()}-${publicationCount++}`;
   const artifacts = [
-    { source: application, name: "UNO-PangYu.exe" },
-    { source: installer, name: "UNO-PangYu-Setup.exe" },
+    { source: application, name: "UNO-Yan.exe" },
+    { source: installer, name: "UNO-Yan-Setup.exe" },
   ].map((artifact) => ({
     ...artifact,
     destination: join(releaseDirectory, artifact.name),

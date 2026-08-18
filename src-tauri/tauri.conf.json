@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "UNO PangYu",
+  "productName": "UNO Yan",
   "version": "0.1.0",
-  "identifier": "com.iifor.uno-pangyu",
+  "identifier": "com.iifor.uno-yan",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",
@@ -14,7 +14,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "UNO PangYu",
+        "title": "UNO Yan",
         "width": 280,
         "height": 320,
         "resizable": false,
@@ -29,7 +29,7 @@
       },
       {
         "label": "seat-target",
-        "title": "PangYu 座位目标",
+        "title": "Yan 座位目标",
         "url": "index.html?seat-target=1",
         "width": 84,
         "height": 84,
