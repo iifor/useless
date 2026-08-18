@@ -8,6 +8,7 @@
     "dev:windows": "node scripts/dev-windows.mjs",
     "build": "tsc -b && vite build",
     "test": "vitest run",
+    "pet:validate": "node scripts/pet-validate.mjs",
     "tauri": "tauri",
     "tauri:build": "tauri build",
     "dmg": "tauri build --bundles dmg --no-sign",
