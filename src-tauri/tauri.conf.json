@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "UNO Yan",
+  "productName": "Pet Desktop Engine",
   "version": "0.1.0",
-  "identifier": "com.iifor.uno-yan",
+  "identifier": "com.iifor.pet-desktop-engine",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",
@@ -14,7 +14,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "UNO Yan",
+        "title": "Pet Desktop Engine",
         "width": 280,
         "height": 320,
         "resizable": false,
@@ -29,7 +29,7 @@
       },
       {
         "label": "seat-target",
-        "title": "Yan 座位目标",
+        "title": "Pet Desktop Engine 座位目标",
         "url": "index.html?seat-target=1",
         "width": 84,
         "height": 84,

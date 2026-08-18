@@ -765,7 +765,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_focused_uno_window_instead_of_using_a_background_window() {
+    fn rejects_a_focused_pet_window_instead_of_using_a_background_window() {
         let work_area = Rect::new(0.0, 24.0, 1440.0, 876.0);
         let bounds = Rect::new(300.0, 300.0, 600.0, 400.0);
         let own = RawWindow {

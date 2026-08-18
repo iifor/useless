@@ -1,7 +1,7 @@
 [package]
-name = "uno-yan"
+name = "pet-desktop-engine"
 version = "0.1.0"
-description = "UNO Yan desktop pet"
+description = "Shared desktop pet engine"
 authors = ["iifor"]
 edition = "2021"
 

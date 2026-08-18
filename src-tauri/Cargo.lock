@@ -2343,6 +2343,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
 
 [[package]]
+name = "pet-desktop-engine"
+version = "0.1.0"
+dependencies = [
+ "core-foundation",
+ "core-graphics",
+ "objc2-app-kit",
+ "osakit",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-dialog",
+ "tauri-plugin-single-instance",
+ "tempfile",
+ "trash",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "phf"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4015,25 +4034,6 @@ name = "unicode-segmentation"
 version = "1.13.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c6f5d3c3b1bf09027a88a6bc961fc00497d651009560b5463668dc81b0fa87a8"
-
-[[package]]
-name = "uno-yan"
-version = "0.1.0"
-dependencies = [
- "core-foundation",
- "core-graphics",
- "objc2-app-kit",
- "osakit",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-dialog",
- "tauri-plugin-single-instance",
- "tempfile",
- "trash",
- "windows-sys 0.61.2",
-]
 
 [[package]]
 name = "url"

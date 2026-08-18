@@ -677,7 +677,7 @@ where
     T: Send + 'static,
 {
     std::thread::Builder::new()
-        .name("uno-trash".into())
+        .name("pet-trash".into())
         .spawn(operation)
         .map_err(|error| format!("无法启动回收站线程: {error}"))?
         .join()
@@ -1234,12 +1234,12 @@ mod tests {
     fn windows_recycle_adapter_moves_a_file_to_the_recycle_bin() {
         let directory = tempfile::tempdir().unwrap();
         let name = format!(
-            "uno-recycle-adapter-{}-{}.txt",
+            "pet-recycle-adapter-{}-{}.txt",
             std::process::id(),
             NEXT_TEST_DIR.fetch_add(1, Ordering::Relaxed)
         );
         let path = directory.path().join(&name);
-        fs::write(&path, "UNO recycle adapter test").unwrap();
+        fs::write(&path, "desktop pet recycle adapter test").unwrap();
 
         recycle_path(&path).unwrap();
         assert!(!path.exists());
