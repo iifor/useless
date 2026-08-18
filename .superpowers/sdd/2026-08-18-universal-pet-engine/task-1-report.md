@@ -32,3 +32,54 @@ Result: 20 tests passed. The tests use temporary package directories and cover f
 ## Concerns
 
 None.
+
+## Fix round 1 — PNG IHDR and contract regressions
+
+The original RED section above is retained as the bootstrap import failure: the validator module did not yet exist. This fix round used a separate assertion-based RED test against the existing validator.
+
+### Assertion RED evidence
+
+Command: `pnpm vitest run tests/pet/characterPackage.test.js`
+
+Exit: `1`
+
+Relevant output:
+
+```text
+× character packages > rejects a strip with invalid PNG IHDR length
+  → expected [] to deeply equal ArrayContaining{…}
+
+- ArrayContaining [
+-   StringContaining "IHDR length must be 13",
+- ]
++ []
+
+Test Files  1 failed (1)
+Tests  1 failed | 23 passed (24)
+EXIT_CODE=1
+```
+
+The new missing-`idle-stand`, optional-idle-strip, and zero-dimension tests passed in RED because those contract checks already existed; no production change was required for them.
+
+### GREEN evidence
+
+Command: `pnpm vitest run tests/pet/characterPackage.test.js`
+
+Exit: `0`
+
+Result: 24 tests passed after rejecting non-13-byte IHDR chunk lengths before fixed-offset reads.
+
+### Fix-round verification
+
+- `pnpm test` — 126 passed, 2 skipped.
+- `pnpm build` — passed.
+
+### Fix-round changes
+
+- `tests/pet/characterPackage.test.js` — malformed IHDR-length, missing `idle-stand`, missing optional idle strip, and zero-dimension regression coverage.
+- `scripts/pet-validate.mjs` — exact IHDR length validation and unused import removal.
+
+### Fix-round commit
+
+- `7b1efac fix: validate PNG IHDR length`
+- This appended fix evidence is committed separately.
