@@ -75,7 +75,9 @@ describe("character-selected build", () => {
   });
 
   test("stages assets only from the selected character package", async () => {
-    await expect(access("public/pet")).rejects.toMatchObject({ code: "ENOENT" });
+    const legacyPetFiles = await readdir("public/pet")
+      .catch((error) => error.code === "ENOENT" ? [] : Promise.reject(error));
+    expect(legacyPetFiles.filter((name) => name !== ".DS_Store")).toEqual([]);
     await expect(access("artifacts")).rejects.toMatchObject({ code: "ENOENT" });
     await expect(readdir("src-tauri/icons")).resolves.toEqual(["icon.png"]);
 

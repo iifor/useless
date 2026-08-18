@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { configDefaults } from "vitest/config";
 import { stageCharacterPublic } from "./scripts/pet-build.mjs";
 
 const node = globalThis as typeof globalThis & {
@@ -19,7 +20,11 @@ export function requireCharacterId(environment: Record<string, string | undefine
 
 export default defineConfig(async ({ mode }) => {
   const test = mode === "test" || Boolean(node.process.env.VITEST);
-  if (test) return { plugins: [react()], clearScreen: false };
+  if (test) return {
+    plugins: [react()],
+    clearScreen: false,
+    test: { exclude: [...configDefaults.exclude, "**/.worktrees/**"] },
+  };
   const id = requireCharacterId(node.process.env);
   const { manifest, publicDir } = await characterViteSettings(node.process.cwd(), id);
   return {
