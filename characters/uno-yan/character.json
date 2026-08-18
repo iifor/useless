@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "id": "uno-yan",
+  "displayName": "UNO Yan",
+  "version": "0.1.0",
+  "bundleId": "com.iifor.uno-yan",
+  "description": "黑色短发、彩色发卡和黄色开衫的像素风桌面宠物。",
+  "idlePoses": ["idle-stand", "idle-sit"],
+  "capabilities": ["desktop-seat", "file-eating"]
+}

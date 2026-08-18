@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "id": "uno",
+  "displayName": "UNO",
+  "version": "0.1.2",
+  "bundleId": "com.blackshirt.companion",
+  "description": "安静慵懒的黑衣桌面宠物。",
+  "idlePoses": ["idle-stand", "idle-sit", "idle-prone", "idle-lie"],
+  "capabilities": ["desktop-seat", "file-eating"]
+}
