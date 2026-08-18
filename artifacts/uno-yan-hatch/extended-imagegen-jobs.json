@@ -1,0 +1,152 @@
+{
+  "version": 1,
+  "canonical_identity_reference": "references/canonical-base.png",
+  "layout_guide": "references/layout-guides/waving.png",
+  "chroma_key": "#00FFFF",
+  "jobs": [
+    {
+      "id": "idle-sit",
+      "status": "complete",
+      "prompt": "prompts/extended/idle-sit.md",
+      "input_images": [
+        { "path": "references/canonical-base.png", "role": "only animation identity reference" },
+        { "path": "references/layout-guides/waving.png", "role": "four-slot layout guide; spacing only, never render it" }
+      ],
+      "output": "public/pet/extended-animations/idle-sit.png",
+      "source_path": "/Users/wuqingfu/.codex/generated_images/01a01341-093d-7913-b083-e18f955b8dd7/exec-db3d2f8f-8688-4daf-82f1-ace3ece6d400.png",
+      "completed_at": "2026-08-18T05:09:30Z"
+    },
+    {
+      "id": "walk-slow-left",
+      "status": "complete",
+      "prompt": "prompts/extended/walk-slow-left.md",
+      "input_images": [
+        { "path": "references/canonical-base.png", "role": "only animation identity reference" },
+        { "path": "references/layout-guides/waving.png", "role": "four-slot layout guide; spacing only, never render it" }
+      ],
+      "output": "public/pet/extended-animations/walk-slow-left.png",
+      "source_path": "/Users/wuqingfu/.codex/generated_images/01a0133e-ef1e-7682-96f0-bb6ba2abc364/exec-b9698eed-5df1-4808-9f6e-8727d7908397.png",
+      "completed_at": "2026-08-18T05:05:38Z"
+    },
+    {
+      "id": "walk-slow-right",
+      "status": "complete",
+      "prompt": "prompts/extended/walk-slow-right.md",
+      "input_images": [
+        { "path": "references/canonical-base.png", "role": "only animation identity reference" },
+        { "path": "references/layout-guides/waving.png", "role": "four-slot layout guide; spacing only, never render it" }
+      ],
+      "output": "public/pet/extended-animations/walk-slow-right.png",
+      "source_path": "/Users/wuqingfu/.codex/generated_images/01a0133d-b2fa-7c20-8292-ae6195b3dd45/exec-c48b36a9-92b5-4395-ba6d-c38cf1a2d5d5.png",
+      "completed_at": "2026-08-18T05:05:38Z"
+    },
+    {
+      "id": "walk-slow-up",
+      "status": "complete",
+      "prompt": "prompts/extended/walk-slow-up.md",
+      "input_images": [
+        { "path": "references/canonical-base.png", "role": "only animation identity reference" },
+        { "path": "references/layout-guides/waving.png", "role": "four-slot layout guide; spacing only, never render it" }
+      ],
+      "output": "public/pet/extended-animations/walk-slow-up.png",
+      "source_path": "/Users/wuqingfu/.codex/generated_images/01a01344-14e2-7ca3-8040-e537f68f9344/exec-864939c5-2a9d-47d5-a493-2de972e1ed09.png",
+      "completed_at": "2026-08-18T05:09:30Z"
+    },
+    {
+      "id": "walk-slow-down",
+      "status": "complete",
+      "prompt": "prompts/extended/walk-slow-down.md",
+      "input_images": [
+        { "path": "references/canonical-base.png", "role": "only animation identity reference" },
+        { "path": "references/layout-guides/waving.png", "role": "four-slot layout guide; spacing only, never render it" }
+      ],
+      "output": "public/pet/extended-animations/walk-slow-down.png",
+      "source_path": "/Users/wuqingfu/.codex/generated_images/01a01349-f449-7f51-97cb-bdc0f082a401/exec-41017bfe-76a2-4b9d-bc38-fda3899bb6a5.png",
+      "completed_at": "2026-08-18T05:16:01Z"
+    },
+    {
+      "id": "search-seat",
+      "status": "complete",
+      "prompt": "prompts/extended/search-seat.md",
+      "input_images": [
+        { "path": "references/canonical-base.png", "role": "only animation identity reference" },
+        { "path": "references/layout-guides/waving.png", "role": "four-slot layout guide; spacing only, never render it" }
+      ],
+      "output": "public/pet/extended-animations/search-seat.png",
+      "source_path": "/Users/wuqingfu/.codex/generated_images/01a01344-6cd0-75a0-a850-bd786a621509/exec-f179145d-027b-4998-8c7a-01c48e57af99.png",
+      "completed_at": "2026-08-18T05:10:25Z"
+    },
+    {
+      "id": "search-current-window",
+      "status": "complete",
+      "prompt": "prompts/extended/search-current-window.md",
+      "input_images": [
+        { "path": "references/canonical-base.png", "role": "only animation identity reference" },
+        { "path": "references/layout-guides/waving.png", "role": "four-slot layout guide; spacing only, never render it" }
+      ],
+      "output": "public/pet/extended-animations/search-current-window.png",
+      "source_path": "/Users/wuqingfu/.codex/generated_images/01a01348-47e7-70e3-8bcf-4b00c244b98f/exec-0badda2f-36bd-4cea-853f-e5c28d34c254.png",
+      "completed_at": "2026-08-18T05:15:10Z"
+    },
+    {
+      "id": "search-desktop-icon",
+      "status": "complete",
+      "prompt": "prompts/extended/search-desktop-icon.md",
+      "input_images": [
+        { "path": "references/canonical-base.png", "role": "only animation identity reference" },
+        { "path": "references/layout-guides/waving.png", "role": "four-slot layout guide; spacing only, never render it" }
+      ],
+      "output": "public/pet/extended-animations/search-desktop-icon.png",
+      "source_path": "/Users/wuqingfu/.codex/generated_images/01a0134d-75c6-7ee1-97fb-ad76dd74e647/exec-9e68125f-c56c-434a-b57a-e95636a27bf2.png",
+      "completed_at": "2026-08-18T05:21:07Z"
+    },
+    {
+      "id": "seat-on-item",
+      "status": "complete",
+      "prompt": "prompts/extended/seat-on-item.md",
+      "input_images": [
+        { "path": "references/canonical-base.png", "role": "only animation identity reference" },
+        { "path": "references/layout-guides/waving.png", "role": "four-slot layout guide; spacing only, never render it" }
+      ],
+      "output": "public/pet/extended-animations/seat-on-item.png",
+      "source_path": "/Users/wuqingfu/.codex/generated_images/01a01348-9054-7061-90a2-7bc173982d73/exec-1875cdb1-d772-4a4f-b04c-c87113fa23da.png",
+      "completed_at": "2026-08-18T05:15:10Z"
+    },
+    {
+      "id": "look-file",
+      "status": "complete",
+      "prompt": "prompts/extended/look-file.md",
+      "input_images": [
+        { "path": "references/canonical-base.png", "role": "only animation identity reference" },
+        { "path": "references/layout-guides/waving.png", "role": "four-slot layout guide; spacing only, never render it" }
+      ],
+      "output": "public/pet/extended-animations/look-file.png",
+      "source_path": "/Users/wuqingfu/.codex/generated_images/01a0134d-95ae-73c2-b79c-7d34623d66ce/exec-5d033eb7-cdb1-4603-bb4a-bb5fec8bfcaf.png",
+      "completed_at": "2026-08-18T05:21:07Z"
+    },
+    {
+      "id": "ask-confirm",
+      "status": "complete",
+      "prompt": "prompts/extended/ask-confirm.md",
+      "input_images": [
+        { "path": "references/canonical-base.png", "role": "only animation identity reference" },
+        { "path": "references/layout-guides/waving.png", "role": "four-slot layout guide; spacing only, never render it" }
+      ],
+      "output": "public/pet/extended-animations/ask-confirm.png",
+      "source_path": "/Users/wuqingfu/.codex/generated_images/01a0134d-b6d8-7793-ade2-69107c55f07d/exec-0293fb56-2b20-4206-9671-3575866afb23.png",
+      "completed_at": "2026-08-18T05:21:07Z"
+    },
+    {
+      "id": "eat-normal",
+      "status": "complete",
+      "prompt": "prompts/extended/eat-normal.md",
+      "input_images": [
+        { "path": "references/canonical-base.png", "role": "only animation identity reference" },
+        { "path": "references/layout-guides/waving.png", "role": "four-slot layout guide; spacing only, never render it" }
+      ],
+      "output": "public/pet/extended-animations/eat-normal.png",
+      "source_path": "/Users/wuqingfu/.codex/generated_images/01a01351-c758-7003-9b58-9ca931e533e3/exec-5c4628ff-cd0b-459b-9203-2a10acfe9967.png",
+      "completed_at": "2026-08-18T05:24:07Z"
+    }
+  ]
+}

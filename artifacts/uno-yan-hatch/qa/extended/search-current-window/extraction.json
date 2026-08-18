@@ -1,0 +1,61 @@
+{
+  "ok": true,
+  "strip": "/Users/wuqingfu/Desktop/hatch-pet/desktop-app/.worktrees/uno-yan/public/pet/extended-animations/search-current-window.png",
+  "directions": [
+    "000",
+    "090",
+    "180",
+    "270"
+  ],
+  "errors": [],
+  "anchors": [
+    {
+      "direction": "000",
+      "source_box": [
+        0,
+        0,
+        453,
+        868
+      ],
+      "used_pixels": 120936,
+      "edge_pixels": 0,
+      "output": "/Users/wuqingfu/Desktop/hatch-pet/desktop-app/.worktrees/uno-yan/artifacts/uno-yan-hatch/qa/extended/search-current-window/anchors/000.png"
+    },
+    {
+      "direction": "090",
+      "source_box": [
+        453,
+        0,
+        906,
+        868
+      ],
+      "used_pixels": 120886,
+      "edge_pixels": 0,
+      "output": "/Users/wuqingfu/Desktop/hatch-pet/desktop-app/.worktrees/uno-yan/artifacts/uno-yan-hatch/qa/extended/search-current-window/anchors/090.png"
+    },
+    {
+      "direction": "180",
+      "source_box": [
+        906,
+        0,
+        1358,
+        868
+      ],
+      "used_pixels": 119025,
+      "edge_pixels": 0,
+      "output": "/Users/wuqingfu/Desktop/hatch-pet/desktop-app/.worktrees/uno-yan/artifacts/uno-yan-hatch/qa/extended/search-current-window/anchors/180.png"
+    },
+    {
+      "direction": "270",
+      "source_box": [
+        1358,
+        0,
+        1811,
+        868
+      ],
+      "used_pixels": 120214,
+      "edge_pixels": 0,
+      "output": "/Users/wuqingfu/Desktop/hatch-pet/desktop-app/.worktrees/uno-yan/artifacts/uno-yan-hatch/qa/extended/search-current-window/anchors/270.png"
+    }
+  ]
+}

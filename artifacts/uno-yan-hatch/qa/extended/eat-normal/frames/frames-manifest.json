@@ -1,0 +1,24 @@
+{
+  "ok": true,
+  "chroma_key": {
+    "hex": "#00FFFF",
+    "rgb": [
+      0,
+      255,
+      255
+    ],
+    "threshold": 96.0
+  },
+  "rows": [
+    {
+      "state": "waving",
+      "frames": [
+        "/Users/wuqingfu/Desktop/hatch-pet/desktop-app/.worktrees/uno-yan/artifacts/uno-yan-hatch/qa/extended/eat-normal/frames/waving/00.png",
+        "/Users/wuqingfu/Desktop/hatch-pet/desktop-app/.worktrees/uno-yan/artifacts/uno-yan-hatch/qa/extended/eat-normal/frames/waving/01.png",
+        "/Users/wuqingfu/Desktop/hatch-pet/desktop-app/.worktrees/uno-yan/artifacts/uno-yan-hatch/qa/extended/eat-normal/frames/waving/02.png",
+        "/Users/wuqingfu/Desktop/hatch-pet/desktop-app/.worktrees/uno-yan/artifacts/uno-yan-hatch/qa/extended/eat-normal/frames/waving/03.png"
+      ],
+      "method": "components"
+    }
+  ]
+}

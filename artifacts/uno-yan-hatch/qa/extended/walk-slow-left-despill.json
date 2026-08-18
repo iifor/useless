@@ -1,0 +1,22 @@
+{
+  "ok": true,
+  "input": "/Users/wuqingfu/Desktop/hatch-pet/desktop-app/.worktrees/uno-yan/public/pet/extended-animations/walk-slow-left.png",
+  "output": "/Users/wuqingfu/Desktop/hatch-pet/desktop-app/.worktrees/uno-yan/public/pet/extended-animations/walk-slow-left.png",
+  "chroma_key": "#00FFFF",
+  "algorithm": "edge-local-chroma-spill-suppression",
+  "strength": 1,
+  "edge_radius": 5,
+  "spill_tolerance": 0.15,
+  "minimum_saturation": 0.1,
+  "changed_pixels": 7253,
+  "decontaminated_pixels": 7063,
+  "spill_suppressed_pixels": 7253,
+  "rejected_pixels": 0,
+  "changed_by_cell": {
+    "r0c3": 1873,
+    "r0c1": 1852,
+    "r0c0": 1812,
+    "r0c2": 1716
+  },
+  "alpha_preserved": true
+}

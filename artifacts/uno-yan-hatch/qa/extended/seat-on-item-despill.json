@@ -1,0 +1,22 @@
+{
+  "ok": true,
+  "input": "/Users/wuqingfu/Desktop/hatch-pet/desktop-app/.worktrees/uno-yan/public/pet/extended-animations/seat-on-item.png",
+  "output": "/Users/wuqingfu/Desktop/hatch-pet/desktop-app/.worktrees/uno-yan/public/pet/extended-animations/seat-on-item.png",
+  "chroma_key": "#00FFFF",
+  "algorithm": "edge-local-chroma-spill-suppression",
+  "strength": 1,
+  "edge_radius": 5,
+  "spill_tolerance": 0.15,
+  "minimum_saturation": 0.1,
+  "changed_pixels": 6113,
+  "decontaminated_pixels": 5933,
+  "spill_suppressed_pixels": 6113,
+  "rejected_pixels": 0,
+  "changed_by_cell": {
+    "r0c1": 1562,
+    "r0c2": 1559,
+    "r0c0": 1514,
+    "r0c3": 1478
+  },
+  "alpha_preserved": true
+}

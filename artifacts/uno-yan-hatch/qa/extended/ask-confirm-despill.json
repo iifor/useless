@@ -1,0 +1,22 @@
+{
+  "ok": true,
+  "input": "/Users/wuqingfu/Desktop/hatch-pet/desktop-app/.worktrees/uno-yan/public/pet/extended-animations/ask-confirm.png",
+  "output": "/Users/wuqingfu/Desktop/hatch-pet/desktop-app/.worktrees/uno-yan/public/pet/extended-animations/ask-confirm.png",
+  "chroma_key": "#00FFFF",
+  "algorithm": "edge-local-chroma-spill-suppression",
+  "strength": 1,
+  "edge_radius": 5,
+  "spill_tolerance": 0.15,
+  "minimum_saturation": 0.1,
+  "changed_pixels": 6645,
+  "decontaminated_pixels": 6474,
+  "spill_suppressed_pixels": 6645,
+  "rejected_pixels": 0,
+  "changed_by_cell": {
+    "r0c2": 1681,
+    "r0c1": 1663,
+    "r0c3": 1654,
+    "r0c0": 1647
+  },
+  "alpha_preserved": true
+}
