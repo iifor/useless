@@ -183,6 +183,14 @@ describe("character packages", () => {
     await expectRepairedStrips("uno-pangyu", repaired);
   });
 
+  test("keeps retained canonical sources at the public package root", async () => {
+    await expect(sha256(join(packageRoot, "uno-pangyu", "canonical-base.png"))).resolves.toBe("9cb76148734e8f3e7b491a7714ad8f992b8f4084eb6d42c4577d8af211fd3363");
+    await expect(sha256(join(packageRoot, "uno-yan", "canonical-base.png"))).resolves.toBe("c64747170d7ed7971ee01aa46f27aaccc5258a1ea481769c0ddf705bff92e525");
+    await expect(readFile(join(packageRoot, "uno", "canonical-base.png"))).rejects.toMatchObject({ code: "ENOENT" });
+    await expect(readFile(join(packageRoot, "uno-pangyu", "qa", "canonical.png"))).rejects.toMatchObject({ code: "ENOENT" });
+    await expect(readFile(join(packageRoot, "uno-yan", "qa", "canonical.png"))).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
   test("accepts a complete package", async () => {
     const root = await tempRoot();
     await writePackage(root, "full-pet", {
