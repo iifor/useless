@@ -8,15 +8,15 @@
   "edge_radius": 5,
   "spill_tolerance": 0.15,
   "minimum_saturation": 0.1,
-  "changed_pixels": 6113,
-  "decontaminated_pixels": 5933,
-  "spill_suppressed_pixels": 6113,
+  "changed_pixels": 6314,
+  "decontaminated_pixels": 6101,
+  "spill_suppressed_pixels": 6314,
   "rejected_pixels": 0,
   "changed_by_cell": {
-    "r0c1": 1562,
-    "r0c2": 1559,
-    "r0c0": 1514,
-    "r0c3": 1478
+    "r0c2": 1615,
+    "r0c0": 1579,
+    "r0c3": 1572,
+    "r0c1": 1548
   },
   "alpha_preserved": true
 }

@@ -14,46 +14,46 @@
       "source_box": [
         0,
         0,
-        444,
-        887
+        418,
+        941
       ],
-      "used_pixels": 118630,
+      "used_pixels": 111504,
       "edge_pixels": 0,
       "output": "/Users/wuqingfu/Desktop/hatch-pet/desktop-app/.worktrees/uno-yan/artifacts/uno-yan-hatch/qa/extended/seat-on-item/anchors/000.png"
     },
     {
       "direction": "090",
       "source_box": [
-        444,
+        418,
         0,
-        887,
-        887
+        836,
+        941
       ],
-      "used_pixels": 116111,
+      "used_pixels": 111774,
       "edge_pixels": 0,
       "output": "/Users/wuqingfu/Desktop/hatch-pet/desktop-app/.worktrees/uno-yan/artifacts/uno-yan-hatch/qa/extended/seat-on-item/anchors/090.png"
     },
     {
       "direction": "180",
       "source_box": [
-        887,
+        836,
         0,
-        1330,
-        887
+        1254,
+        941
       ],
-      "used_pixels": 116090,
+      "used_pixels": 111423,
       "edge_pixels": 0,
       "output": "/Users/wuqingfu/Desktop/hatch-pet/desktop-app/.worktrees/uno-yan/artifacts/uno-yan-hatch/qa/extended/seat-on-item/anchors/180.png"
     },
     {
       "direction": "270",
       "source_box": [
-        1330,
+        1254,
         0,
-        1774,
-        887
+        1672,
+        941
       ],
-      "used_pixels": 118675,
+      "used_pixels": 112224,
       "edge_pixels": 0,
       "output": "/Users/wuqingfu/Desktop/hatch-pet/desktop-app/.worktrees/uno-yan/artifacts/uno-yan-hatch/qa/extended/seat-on-item/anchors/270.png"
     }
