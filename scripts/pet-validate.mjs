@@ -70,7 +70,7 @@ async function validatePngStrip(path, errors, label) {
 
 export async function validateCharacterPackage(charactersRoot, id) {
   const packageRoot = join(charactersRoot, id);
-  const manifestFile = join(packageRoot, "manifest.json");
+  const manifestFile = join(packageRoot, "character.json");
   const manifestPath = pathLabel(charactersRoot, manifestFile);
   const stripsRoot = join(packageRoot, "pet", "extended-animations");
   const errors = [];

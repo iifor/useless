@@ -68,7 +68,7 @@ async function writePackage(root, id = "valid-pet", options = {}) {
   await mkdir(petRoot, { recursive: true });
   await mkdir(stripsRoot, { recursive: true });
   await mkdir(iconsRoot, { recursive: true });
-  await writeFile(join(packageRoot, "manifest.json"), JSON.stringify(value));
+  await writeFile(join(packageRoot, options.characterFile ?? "character.json"), JSON.stringify(value));
   await writeFile(join(petRoot, "spritesheet.webp"), "webp");
   await Promise.all(strips.map((strip) => writeFile(join(stripsRoot, `${strip}.png`), png(options.png))));
   await Promise.all([
@@ -108,6 +108,16 @@ describe("character packages", () => {
     await expect(validateCharacterPackage(join(root, "characters"), "reduced-pet")).resolves.toEqual([]);
   });
 
+  test("requires character.json instead of manifest.json", async () => {
+    const root = await tempRoot();
+    await writePackage(root, "manifest-only", { characterFile: "manifest.json" });
+    await writePackage(root, "character-only", { characterFile: "character.json" });
+
+    await expect(validateCharacterPackage(join(root, "characters"), "manifest-only"))
+      .resolves.toEqual(expect.arrayContaining([expect.stringContaining("characters/manifest-only/character.json: missing or invalid JSON")]));
+    await expect(validateCharacterPackage(join(root, "characters"), "character-only")).resolves.toEqual([]);
+  });
+
   test.each([
     ["schema version", { schemaVersion: 2 }, "schemaVersion"],
     ["id", { id: "Invalid Pet" }, "id"],
@@ -120,7 +130,7 @@ describe("character packages", () => {
     await writePackage(root, "valid-pet", { manifest: invalid });
 
     await expect(validateCharacterPackage(join(root, "characters"), "valid-pet"))
-      .resolves.toEqual(expect.arrayContaining([expect.stringContaining(`manifest.json: ${expectedPath}`)]));
+      .resolves.toEqual(expect.arrayContaining([expect.stringContaining(`character.json: ${expectedPath}`)]));
   });
 
   test.each([
@@ -133,7 +143,7 @@ describe("character packages", () => {
     await writePackage(root, "valid-pet", { manifest: invalid });
 
     await expect(validateCharacterPackage(join(root, "characters"), "valid-pet"))
-      .resolves.toEqual(expect.arrayContaining([expect.stringContaining(`manifest.json: ${expectedPath}`)]));
+      .resolves.toEqual(expect.arrayContaining([expect.stringContaining(`character.json: ${expectedPath}`)]));
   });
 
   test("rejects a missing core asset", async () => {
