@@ -51,7 +51,7 @@
           "file": "/Users/wuqingfu/Desktop/hatch-pet/desktop-app/.worktrees/uno-yan/artifacts/uno-yan-hatch/qa/extended/walk-slow-down/frames/waving/02.png",
           "width": 192,
           "height": 208,
-          "nontransparent_pixels": 8153,
+          "nontransparent_pixels": 8152,
           "bbox": [
             62,
             5,
@@ -59,7 +59,7 @@
             203
           ],
           "edge_pixels": 0,
-          "chroma_adjacent_pixels": 1
+          "chroma_adjacent_pixels": 0
         },
         {
           "index": 3,

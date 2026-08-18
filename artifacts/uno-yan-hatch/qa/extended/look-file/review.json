@@ -21,7 +21,7 @@
           "file": "/Users/wuqingfu/Desktop/hatch-pet/desktop-app/.worktrees/uno-yan/artifacts/uno-yan-hatch/qa/extended/look-file/frames/waving/00.png",
           "width": 192,
           "height": 208,
-          "nontransparent_pixels": 9715,
+          "nontransparent_pixels": 9714,
           "bbox": [
             52,
             5,
@@ -29,7 +29,7 @@
             203
           ],
           "edge_pixels": 0,
-          "chroma_adjacent_pixels": 1
+          "chroma_adjacent_pixels": 0
         },
         {
           "index": 1,
@@ -66,7 +66,7 @@
           "file": "/Users/wuqingfu/Desktop/hatch-pet/desktop-app/.worktrees/uno-yan/artifacts/uno-yan-hatch/qa/extended/look-file/frames/waving/03.png",
           "width": 192,
           "height": 208,
-          "nontransparent_pixels": 9734,
+          "nontransparent_pixels": 9733,
           "bbox": [
             52,
             5,
@@ -74,7 +74,7 @@
             203
           ],
           "edge_pixels": 0,
-          "chroma_adjacent_pixels": 1
+          "chroma_adjacent_pixels": 0
         }
       ]
     }
