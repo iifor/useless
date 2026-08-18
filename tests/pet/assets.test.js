@@ -1,4 +1,4 @@
-import { existsSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, test } from "vitest";
@@ -12,5 +12,31 @@ describe("pet animation assets", () => {
       expect(existsSync(asset), animation.source).toBe(true);
       expect(statSync(asset).size, animation.source).toBeGreaterThan(0);
     }
+  });
+
+  test("ships only the reduced UNO Yan pose set", () => {
+    expect(Object.keys(ANIMATIONS)).toEqual([
+      "idle-stand",
+      "idle-sit",
+      "walk-slow-left",
+      "walk-slow-right",
+      "walk-slow-up",
+      "walk-slow-down",
+      "search-seat",
+      "search-current-window",
+      "search-desktop-icon",
+      "seat-on-item",
+      "look-file",
+      "ask-confirm",
+      "eat-normal",
+    ]);
+    for (const removed of ["idle-prone.png", "idle-lie.png", "sleep-side.png"]) {
+      expect(existsSync(join(process.cwd(), "public/pet/extended-animations", removed))).toBe(false);
+    }
+    expect(
+      readFileSync("public/pet/spritesheet.webp").equals(
+        readFileSync("artifacts/uno-yan-hatch/package/spritesheet.webp"),
+      ),
+    ).toBe(true);
   });
 });
