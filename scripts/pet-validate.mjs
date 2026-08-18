@@ -1,6 +1,6 @@
 import { open, readdir, readFile, stat } from "node:fs/promises";
 import { join, relative } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 
 const idlePoses = new Set(["idle-stand", "idle-sit", "idle-prone", "idle-lie"]);
 const capabilities = new Set(["desktop-seat", "file-eating"]);
@@ -48,6 +48,10 @@ async function validatePngStrip(path, errors, label) {
     await file.close();
     if (bytesRead < header.length || !header.subarray(0, 8).equals(pngSignature)) {
       errors.push(`${label}: invalid PNG signature`);
+      return;
+    }
+    if (header.readUInt32BE(8) !== 13) {
+      errors.push(`${label}: PNG IHDR length must be 13`);
       return;
     }
     if (header.subarray(12, 16).toString("ascii") !== "IHDR") {

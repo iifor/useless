@@ -39,11 +39,11 @@ function manifest(overrides = {}) {
   };
 }
 
-function png({ signature = true, width = 4, height = 1, colorType = 6 } = {}) {
+function png({ signature = true, ihdrLength = 13, width = 4, height = 1, colorType = 6 } = {}) {
   const header = Buffer.alloc(29);
   Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]).copy(header);
   if (!signature) header[0] = 0;
-  header.writeUInt32BE(13, 8);
+  header.writeUInt32BE(ihdrLength, 8);
   header.write("IHDR", 12, "ascii");
   header.writeUInt32BE(width, 16);
   header.writeUInt32BE(height, 20);
@@ -161,10 +161,29 @@ describe("character packages", () => {
     await expect(validateCharacterPackage(join(root, "characters"), "valid-pet")).resolves.toEqual([]);
   });
 
+  test("rejects a package without idle-stand", async () => {
+    const root = await tempRoot();
+    await writePackage(root, "valid-pet", { manifest: { idlePoses: ["idle-sit"] } });
+
+    await expect(validateCharacterPackage(join(root, "characters"), "valid-pet"))
+      .resolves.toEqual(expect.arrayContaining([expect.stringContaining("idlePoses must include idle-stand")]));
+  });
+
+  test("rejects a missing strip for an enabled optional idle pose", async () => {
+    const root = await tempRoot();
+    const packageRoot = await writePackage(root, "valid-pet", { manifest: { idlePoses: ["idle-stand", "idle-sit"] } });
+    await unlink(join(packageRoot, "pet", "idle-sit.png"));
+
+    await expect(validateCharacterPackage(join(root, "characters"), "valid-pet"))
+      .resolves.toEqual(expect.arrayContaining([expect.stringContaining("pet/idle-sit.png: missing")]));
+  });
+
   test.each([
     ["signature", { signature: false }, "PNG signature"],
+    ["IHDR length", { ihdrLength: 12 }, "IHDR length must be 13"],
     ["color type", { colorType: 2 }, "RGBA"],
     ["width", { width: 3 }, "divisible by 4"],
+    ["dimensions", { width: 0 }, "dimensions must be positive"],
   ])("rejects a strip with invalid PNG %s", async (_caseName, options, expected) => {
     const root = await tempRoot();
     await writePackage(root, "valid-pet", { png: options });
