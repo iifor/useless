@@ -83,3 +83,54 @@ Result: 24 tests passed after rejecting non-13-byte IHDR chunk lengths before fi
 
 - `7b1efac fix: validate PNG IHDR length`
 - This appended fix evidence is committed separately.
+
+## Fix round 2 — Nested animation-strip layout
+
+The approved package layout requires every strip at `characters/<id>/pet/extended-animations/<strip>.png`. `pet/spritesheet.webp` remains at the pet root and icons remain unchanged.
+
+### Assertion RED evidence
+
+Command: `pnpm vitest run tests/pet/characterPackage.test.js -t "requires strips under pet/extended-animations"`
+
+Exit: `1`
+
+Relevant output:
+
+```text
+× character packages > requires strips under pet/extended-animations
+  → expected [] to deeply equal ArrayContaining{…}
+
+- ArrayContaining [
+-   StringContaining "pet/extended-animations/walk-slow-left.png: missing",
+- ]
++ []
+
+Test Files  1 failed (1)
+Tests  1 failed | 24 skipped (25)
+EXIT_CODE=1
+```
+
+The flat package was accepted before the change, which is the intended regression signal.
+
+### GREEN evidence
+
+Command: `pnpm vitest run tests/pet/characterPackage.test.js`
+
+Exit: `0`
+
+Result: 25 tests passed. The new path regression rejects flat strips and accepts nested strips.
+
+### Fix-round verification
+
+- `pnpm test` — 127 passed, 2 skipped.
+- `pnpm build` — passed.
+
+### Fix-round changes
+
+- `tests/pet/characterPackage.test.js` — nested temporary strip fixtures, nested path assertions, and flat-versus-nested regression coverage.
+- `scripts/pet-validate.mjs` — strips resolve only from `pet/extended-animations`.
+
+### Fix-round commit
+
+- `7ee4e12 fix: nest character animation strips`
+- This appended fix evidence is committed separately.
