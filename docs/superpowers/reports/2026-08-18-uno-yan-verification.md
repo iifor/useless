@@ -20,12 +20,12 @@ The Tauri build also reran the frontend build successfully before compiling the 
 
 - `rg -n -i 'pangyu|uno-pangyu' src public src-tauri scripts package.json index.html README.md` returned no matches. The only repository-scope matches outside excluded historical docs/artifacts were negative identity assertions in `tests/release/appIdentity.test.js`.
 - `package.json` has no updater dependency, `src-tauri/tauri.conf.json` has no updater endpoint/configuration, the product/runtime search for `updater|releases/latest` returned no matches, and `.github/workflows` does not exist.
-- `PetAction`, `PET_POSES`, `ANIMATIONS`, and `MANUAL_ACTIONS` contain no prone, lie, or sleep action. The automatic pool is exactly stand, sit, and slow walk.
+- `PetAction`, `PET_POSES`, `ANIMATIONS`, and `MANUAL_ACTIONS` contain no prone, lie, or sleep action. The regular automatic-action pool is exactly stand, sit, and slow walk; the scheduler separately retains the 8% `SEARCH_SEAT` seating easter egg.
 - `contentLongEdgeForPose()` returns exactly `119`; the TypeScript suite verifies all runtime poses use that value.
 - The runtime has exactly the twelve required extension PNGs plus `public/pet/spritesheet.webp`. The asset contract test verifies every configured path exists and is non-empty, and verifies the removed prone/lie/sleep files are absent.
 - `public/pet/spritesheet.webp` and `artifacts/uno-yan-hatch/package/spritesheet.webp` have the same SHA-256: `310f3fc29c02733c754d96a06141bdac6402f09105b75f67f16f0f14f7e5ab84`.
 - `artifacts/uno-yan-hatch/package/pet.json` identifies `uno-yan`, displays `UNO Yan`, and uses `spriteVersionNumber: 2`. Standard and extension contact sheets and the deterministic QA JSON remain under `artifacts/uno-yan-hatch/qa/`.
-- `git diff --quiet e1f9895 -- src-tauri/src/food_safety.rs` exited 0: the reused `FoodSafety` implementation is unchanged from the PangYu reduced baseline. Rust tests exercised its protected-path, symlink, ownership, replay, replacement, error, and recycle-bin behavior.
+- `git diff --quiet e1f9895 -- src-tauri/src/food_safety.rs` exited 0: the reused `FoodSafety` implementation is unchanged from the PangYu reduced baseline. Rust tests exercised its protected-path, symlink, ownership, replay, replacement, and error rules through injected move closures; they did not exercise a real macOS Trash operation.
 
 ## Produced local artifacts
 
@@ -41,5 +41,6 @@ The bundle is 31 MB. Its `Info.plist` reports `CFBundleName=UNO Yan`, `CFBundleI
 ## Limitations
 
 - This verification did not launch the GUI, exercise desktop permissions, or perform an interactive coexistence check with UNO or UNO PangYu.
-- It did not build or run Windows artifacts. Windows behavior is covered only by the existing TypeScript build-script tests and Rust conditional code compilation available to the current target.
+- It did not build or run Windows artifacts. The Windows Recycle Bin `cfg(windows)` path was neither compiled nor verified on this macOS run; only the existing platform-independent TypeScript build-script tests ran.
+- No real macOS Trash operation was performed; FoodSafety tests used injected closures to verify the surrounding safety rules.
 - The debug bundle is local arm64 output. It is not a Universal DMG, signed distribution, notarized package, or Windows installer.
