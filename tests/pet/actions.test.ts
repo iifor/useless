@@ -25,11 +25,12 @@ import {
   windowPositionForBottomCenter,
 } from "../../src/pet/windowMotion";
 import { ANIMATIONS, poseForAction } from "../../src/pet/animations";
+import { fullCharacter } from "./characterFixtures";
 
 describe("action scheduling", () => {
   test("keeps stationary actions between 30 seconds and 5 minutes", () => {
     expect(actionDurationMs(PetAction.IDLE_SIT, () => 0)).toBe(30_000);
-    expect(actionDurationMs(PetAction.IDLE_LIE, () => 0.999)).toBeLessThanOrEqual(300_000);
+    expect(actionDurationMs(PetAction.IDLE_STAND, () => 0.999)).toBeLessThanOrEqual(300_000);
   });
 
   test("plays the seat-search animation for two to four seconds", () => {
@@ -46,16 +47,26 @@ describe("action scheduling", () => {
 
   test("selects the seat action below the 8 percent boundary", () => {
     const random = values(0.079);
-    expect(nextAction(PetAction.IDLE_STAND, random)).toBe(PetAction.SEARCH_SEAT);
+    expect(nextAction(fullCharacter, PetAction.IDLE_STAND, random)).toBe(PetAction.SEARCH_SEAT);
   });
 
   test("does not immediately repeat the current stationary action", () => {
     const random = values(0.08, 0);
-    expect(nextAction(PetAction.IDLE_STAND, random)).not.toBe(PetAction.IDLE_STAND);
+    expect(nextAction(fullCharacter, PetAction.IDLE_STAND, random)).not.toBe(PetAction.IDLE_STAND);
   });
 
   test("does not immediately repeat the seat search action", () => {
-    expect(nextAction(PetAction.SEARCH_SEAT, values(0.01, 0))).not.toBe(PetAction.SEARCH_SEAT);
+    expect(nextAction(fullCharacter, PetAction.SEARCH_SEAT, values(0.01, 0))).not.toBe(PetAction.SEARCH_SEAT);
+  });
+
+  test("automatic mode can cycle through sit, walk, and stand", () => {
+    expect(nextAction(fullCharacter, PetAction.IDLE_STAND, values(0.08, 0)))
+      .toBe(PetAction.IDLE_SIT);
+    expect(nextAction(fullCharacter, PetAction.IDLE_SIT, values(0.08, 0.999)))
+      .toBe(PetAction.WALK_SLOW);
+    expect(nextAction(fullCharacter, PetAction.WALK_SLOW, values(0.08, 0)))
+      .toBe(PetAction.IDLE_STAND);
+    expect(resumeAutomatic()).toEqual({ auto: true, action: PetAction.IDLE_STAND });
   });
 
   test("creates a seat when desktop is empty or the 10 percent roll wins", () => {
@@ -65,18 +76,18 @@ describe("action scheduling", () => {
   });
 
   test("manual selection pauses scheduling and automatic mode resumes standing", () => {
-    expect(manualAction(PetAction.IDLE_PRONE)).toEqual({ auto: false, action: PetAction.IDLE_PRONE });
+    expect(manualAction(PetAction.IDLE_SIT)).toEqual({ auto: false, action: PetAction.IDLE_SIT });
     expect(resumeAutomatic()).toEqual({ auto: true, action: PetAction.IDLE_STAND });
   });
 
   test("keeps the visible automatic action after dragging", () => {
-    expect(dragResumeAction(true, PetAction.IDLE_PRONE, PetAction.IDLE_STAND))
-      .toBe(PetAction.IDLE_PRONE);
+    expect(dragResumeAction(true, PetAction.IDLE_SIT, PetAction.IDLE_STAND))
+      .toBe(PetAction.IDLE_SIT);
   });
 
   test("keeps the selected manual action after dragging", () => {
-    expect(dragResumeAction(false, PetAction.WALK_SLOW, PetAction.IDLE_LIE))
-      .toBe(PetAction.IDLE_LIE);
+    expect(dragResumeAction(false, PetAction.WALK_SLOW, PetAction.IDLE_SIT))
+      .toBe(PetAction.IDLE_SIT);
   });
 
   test("does not let a drag continuation restart scheduling while the picker is pending", () => {
@@ -85,8 +96,8 @@ describe("action scheduling", () => {
   });
 
   test("automatic food completion resumes from standing", () => {
-    expect(foodResumeAction(true, PetAction.IDLE_LIE)).toBe(PetAction.IDLE_STAND);
-    expect(foodResumeAction(false, PetAction.IDLE_LIE)).toBe(PetAction.IDLE_LIE);
+    expect(foodResumeAction(true, PetAction.IDLE_SIT)).toBe(PetAction.IDLE_STAND);
+    expect(foodResumeAction(false, PetAction.IDLE_SIT)).toBe(PetAction.IDLE_SIT);
   });
 
   test("clears the seat after an automatic seated action completes", () => {
@@ -100,33 +111,39 @@ describe("action scheduling", () => {
   test("maps every action to a valid animation pose", () => {
     for (const action of Object.values(PetAction)) {
       for (const direction of ["left", "right", "up", "down"] as const) {
-        expect(poseForAction(action, direction)).toBeTruthy();
+        expect(poseForAction(fullCharacter, action, direction)).toBeTruthy();
       }
     }
   });
 
+  test("keeps prone and lying in the shared superset without restoring sleep", () => {
+    expect(PetAction).toHaveProperty("IDLE_PRONE");
+    expect(PetAction).toHaveProperty("IDLE_LIE");
+    expect(PetAction).not.toHaveProperty("SLEEP");
+  });
+
   test("maps each walking direction to its own pose", () => {
-    expect(poseForAction(PetAction.WALK_SLOW, "left")).toBe("walk-slow-left");
-    expect(poseForAction(PetAction.WALK_SLOW, "right")).toBe("walk-slow-right");
-    expect(poseForAction(PetAction.WALK_SLOW, "up")).toBe("walk-slow-up");
-    expect(poseForAction(PetAction.WALK_SLOW, "down")).toBe("walk-slow-down");
+    expect(poseForAction(fullCharacter, PetAction.WALK_SLOW, "left")).toBe("walk-slow-left");
+    expect(poseForAction(fullCharacter, PetAction.WALK_SLOW, "right")).toBe("walk-slow-right");
+    expect(poseForAction(fullCharacter, PetAction.WALK_SLOW, "up")).toBe("walk-slow-up");
+    expect(poseForAction(fullCharacter, PetAction.WALK_SLOW, "down")).toBe("walk-slow-down");
     expect(ANIMATIONS["walk-slow-up"]).toMatchObject({ frameCount: 4, fps: 5 });
     expect(ANIMATIONS["walk-slow-down"]).toMatchObject({ frameCount: 4, fps: 5 });
   });
 
   test("maps food actions to valid poses", () => {
-    expect(poseForAction(PetAction.LOOK_AT_FILE, "right")).toBe("look-file");
-    expect(poseForAction(PetAction.ASK_CONFIRM, "right")).toBe("ask-confirm");
-    expect(poseForAction(PetAction.EAT_NORMAL, "right")).toBe("eat-normal");
+    expect(poseForAction(fullCharacter, PetAction.LOOK_AT_FILE, "right")).toBe("look-file");
+    expect(poseForAction(fullCharacter, PetAction.ASK_CONFIRM, "right")).toBe("ask-confirm");
+    expect(poseForAction(fullCharacter, PetAction.EAT_NORMAL, "right")).toBe("eat-normal");
     expect(ANIMATIONS["look-file"]).toMatchObject({ frameCount: 4, fps: 4 });
     expect(ANIMATIONS["ask-confirm"]).toMatchObject({ frameCount: 4, fps: 2 });
     expect(ANIMATIONS["eat-normal"].frameCount).toBe(4);
   });
 
   test("uses a dedicated four-frame animation while searching for a seat", () => {
-    expect(poseForAction(PetAction.SEARCH_SEAT, "right")).toBe("search-seat");
-    expect(poseForAction(PetAction.SEARCH_CURRENT_WINDOW, "right")).toBe("search-current-window");
-    expect(poseForAction(PetAction.SEARCH_DESKTOP_ICON, "right")).toBe("search-desktop-icon");
+    expect(poseForAction(fullCharacter, PetAction.SEARCH_SEAT, "right")).toBe("search-seat");
+    expect(poseForAction(fullCharacter, PetAction.SEARCH_CURRENT_WINDOW, "right")).toBe("search-current-window");
+    expect(poseForAction(fullCharacter, PetAction.SEARCH_DESKTOP_ICON, "right")).toBe("search-desktop-icon");
     expect(ANIMATIONS["search-seat"].frameCount).toBe(4);
     expect(ANIMATIONS["search-current-window"]).toMatchObject({ frameCount: 4, fps: 1.5 });
     expect(ANIMATIONS["search-desktop-icon"]).toMatchObject({ frameCount: 4, fps: 1.5 });
@@ -229,31 +246,65 @@ describe("window movement", () => {
       .toEqual({ x: 1000, y: 460 });
   });
 
-  test("uses one direct segment for vertical and diagonal targets", () => {
+  test("uses axis-aligned segments for vertical, horizontal, and diagonal targets", () => {
+    const area = { x: 0, y: 0, width: 1440, height: 900 };
+    const size = { width: 280, height: 320 };
+
     expect(planWalkPath(
       { x: 500, y: 100 },
       { x: 500, y: 500 },
-      { x: 0, y: 0, width: 1440, height: 900 },
-      { width: 280, height: 320 },
+      area,
+      size,
       1,
     )).toEqual([{ x: 500, y: 500 }]);
     expect(planWalkPath(
       { x: 100, y: 100 },
-      { x: 500, y: 500 },
-      { x: 0, y: 0, width: 1440, height: 900 },
-      { width: 280, height: 320 },
+      { x: 500, y: 100 },
+      area,
+      size,
       1,
-    )).toEqual([{ x: 500, y: 500 }]);
+    )).toEqual([{ x: 500, y: 100 }]);
+    expect(planWalkPath(
+      { x: 100, y: 100 },
+      { x: 500, y: 500 },
+      area,
+      size,
+      1,
+    )).toEqual([{ x: 500, y: 100 }, { x: 500, y: 500 }]);
   });
 
-  test("clamps a direct path at the monitor edge", () => {
+  test("clamps the target before creating an axis-aligned path", () => {
     expect(planWalkPath(
       { x: 500, y: 100 },
       { x: 2000, y: 2000 },
       { x: 0, y: 0, width: 1440, height: 900 },
       { width: 280, height: 320 },
       1,
-    )).toEqual([{ x: 1160, y: 580 }]);
+    )).toEqual([{ x: 1160, y: 100 }, { x: 1160, y: 580 }]);
+  });
+
+  test("never returns a diagonal segment and omits an unchanged target", () => {
+    const current = { x: 120, y: 140 };
+    const path = planWalkPath(
+      current,
+      { x: 760, y: 520 },
+      { x: 0, y: 0, width: 1200, height: 800 },
+      { width: 120, height: 160 },
+      1,
+    );
+    const points = [current, ...path];
+
+    for (let index = 1; index < points.length; index += 1) {
+      expect(points[index].x === points[index - 1].x
+        || points[index].y === points[index - 1].y).toBe(true);
+    }
+    expect(planWalkPath(
+      current,
+      current,
+      { x: 0, y: 0, width: 1200, height: 800 },
+      { width: 120, height: 160 },
+      1,
+    )).toEqual([]);
   });
 });
 

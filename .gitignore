@@ -10,3 +10,4 @@ docs
 vite.config.js
 vite.config.d.ts
 src-tauri/tauri.release.local.conf.json
+/.pet-build/

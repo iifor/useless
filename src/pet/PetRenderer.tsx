@@ -3,17 +3,16 @@ import { useEffect, useRef, type MouseEvent, type PointerEvent } from "react";
 
 import {
   atlasFrameRect,
-  canvasPixelPoint,
   computeAnimationViewport,
   findAlphaBounds,
   horizontalContentAnchor,
-  isAlphaHit,
   normalizedContentScale,
   stripFrameRect,
   type ContentBounds,
 } from "./animation";
 import { ANIMATIONS, contentLongEdgeForPose, type PetPose } from "./animations";
 import { beginPetViewportLayout } from "./WindowMover";
+import { canStartPetDrag, petContextMenuPoint } from "./petInput";
 import type { Point, Size } from "./windowMotion";
 
 const ATLAS_CELL_WIDTH = 192;
@@ -22,6 +21,7 @@ const CONTENT_PADDING = 8;
 const DEFAULT_VIEWPORT_SIZE = 216;
 
 export interface PetRendererProps {
+  displayName: string;
   pose: PetPose;
   scale: number;
   onDragStart?: () => void;
@@ -32,6 +32,7 @@ export interface PetRendererProps {
 }
 
 export default function PetRenderer({
+  displayName,
   pose,
   scale,
   onDragStart,
@@ -168,22 +169,13 @@ export default function PetRenderer({
     };
   }, [pose, scale]);
 
-  const isBodyHit = (clientX: number, clientY: number): boolean => {
-    const canvas = canvasRef.current;
-    const context = canvas?.getContext("2d", { willReadFrequently: true });
-    if (!canvas || !context) return false;
-
-    const bounds = canvas.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
-    const point = canvasPixelPoint(clientX, clientY, bounds, dpr);
-    const pixel = context.getImageData(point.x, point.y, 1, 1).data;
-    return isAlphaHit(pixel, 0);
-  };
-
   const startDragging = async (event: PointerEvent<HTMLCanvasElement>) => {
-    if (dragDisabled || event.button !== 0 || !("__TAURI_INTERNALS__" in window)) return;
+    if (!canStartPetDrag(
+      dragDisabled,
+      event.button,
+      "__TAURI_INTERNALS__" in window,
+    )) return;
 
-    if (!isBodyHit(event.clientX, event.clientY)) return;
     onDragStart?.();
     try {
       await getCurrentWindow().startDragging();
@@ -194,14 +186,12 @@ export default function PetRenderer({
 
   const openContextMenu = (event: MouseEvent<HTMLCanvasElement>) => {
     event.preventDefault();
-    if (isBodyHit(event.clientX, event.clientY)) {
-      onBodyContextMenu?.({ x: event.clientX, y: event.clientY });
-    }
+    onBodyContextMenu?.(petContextMenuPoint(event.clientX, event.clientY));
   };
 
   return (
     <canvas
-      aria-label="UNO"
+      aria-label={displayName}
       className="pet-canvas"
       height={DEFAULT_VIEWPORT_SIZE}
       onContextMenu={openContextMenu}

@@ -1,3 +1,5 @@
+import type { CharacterManifest, IdlePose } from "./characterManifest";
+
 export enum PetAction {
   IDLE_STAND = "IDLE_STAND",
   IDLE_SIT = "IDLE_SIT",
@@ -20,18 +22,75 @@ export interface ActionSelection {
   action: PetAction;
 }
 
-const REGULAR_ACTIONS = [
-  PetAction.IDLE_STAND,
-  PetAction.IDLE_SIT,
-  PetAction.IDLE_PRONE,
-  PetAction.IDLE_LIE,
+const IDLE_ACTIONS: Record<IdlePose, PetAction> = {
+  "idle-stand": PetAction.IDLE_STAND,
+  "idle-sit": PetAction.IDLE_SIT,
+  "idle-prone": PetAction.IDLE_PRONE,
+  "idle-lie": PetAction.IDLE_LIE,
+};
+
+const ALL_ACTIONS = [
+  ...Object.values(IDLE_ACTIONS),
   PetAction.WALK_SLOW,
+  PetAction.SEARCH_SEAT,
+  PetAction.SEARCH_CURRENT_WINDOW,
+  PetAction.SEARCH_DESKTOP_ICON,
+  PetAction.SEAT_ON_ITEM,
+  PetAction.LOOK_AT_FILE,
+  PetAction.ASK_CONFIRM,
+  PetAction.EAT_NORMAL,
 ] as const;
 
-export function nextAction(current: PetAction, random = Math.random): PetAction {
-  if (current !== PetAction.SEARCH_SEAT && random() < 0.08) return PetAction.SEARCH_SEAT;
+const SEAT_ACTIONS = new Set<PetAction>([
+  PetAction.SEARCH_SEAT,
+  PetAction.SEARCH_CURRENT_WINDOW,
+  PetAction.SEARCH_DESKTOP_ICON,
+  PetAction.SEAT_ON_ITEM,
+]);
 
-  const candidates = REGULAR_ACTIONS.filter((action) => action !== current);
+const FOOD_ACTIONS = new Set<PetAction>([
+  PetAction.LOOK_AT_FILE,
+  PetAction.ASK_CONFIRM,
+  PetAction.EAT_NORMAL,
+]);
+
+export const hasCapability = (
+  character: CharacterManifest,
+  capability: CharacterManifest["capabilities"][number],
+): boolean => character.capabilities.includes(capability);
+
+export function isActionSupported(character: CharacterManifest, action: PetAction): boolean {
+  const idlePose = Object.entries(IDLE_ACTIONS)
+    .find(([, idleAction]) => idleAction === action)?.[0] as IdlePose | undefined;
+  if (idlePose) return character.idlePoses.includes(idlePose);
+  if (action === PetAction.WALK_SLOW) return true;
+  if (SEAT_ACTIONS.has(action)) return hasCapability(character, "desktop-seat");
+  if (FOOD_ACTIONS.has(action)) return hasCapability(character, "file-eating");
+  return false;
+}
+
+export const actionsForCharacter = (character: CharacterManifest): PetAction[] =>
+  ALL_ACTIONS.filter((action) => isActionSupported(character, action));
+
+export const regularActionsForCharacter = (character: CharacterManifest): PetAction[] => [
+  ...character.idlePoses.map((pose) => IDLE_ACTIONS[pose]),
+  PetAction.WALK_SLOW,
+];
+
+export function nextAction(
+  character: CharacterManifest,
+  current: PetAction,
+  random = Math.random,
+): PetAction {
+  const seatRoll = random();
+  if (
+    isActionSupported(character, PetAction.SEARCH_SEAT)
+    && current !== PetAction.SEARCH_SEAT
+    && seatRoll < 0.08
+  ) return PetAction.SEARCH_SEAT;
+
+  const candidates = regularActionsForCharacter(character)
+    .filter((action) => action !== current);
   return candidates[Math.floor(random() * candidates.length)] ?? PetAction.IDLE_STAND;
 }
 

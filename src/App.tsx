@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
 
 import {
   PetAction,
@@ -7,11 +6,13 @@ import {
   dragResumeAction,
   foodResumeAction,
   nextAction,
+  isActionSupported,
   shouldClearSeatAfterAction,
   shouldResumeAfterDrag,
   type Direction,
 } from "./pet/actions";
 import { poseForAction } from "./pet/animations";
+import { PET_CHARACTER } from "./pet/character";
 import FoodInteraction, {
   beginFoodActivity,
   endFoodActivity,
@@ -21,7 +22,12 @@ import FoodInteraction, {
 import { finishFood, type FoodFlow } from "./pet/foodFlow";
 import { pickFood, trashFood, type FoodPickerKind } from "./pet/foodPicker";
 import PetActionMenu from "./pet/PetActionMenu";
-import type { ActionMenuValue, ManualAction } from "./pet/actionMenu";
+import {
+  actionMenuItemsFor,
+  rootMenuItemsFor,
+  type ActionMenuValue,
+  type ManualAction,
+} from "./pet/actionMenu";
 import {
   arriveThenMaterializeSeat,
   findSeatTarget,
@@ -57,14 +63,12 @@ import {
   type Point,
   type Size,
 } from "./pet/windowMotion";
-import {
-  runAutomaticUpdater,
-  type UpdateBackend,
-  type UpdateMetadata,
-} from "./update/updateScheduler";
 
 const waitForFood = (milliseconds: number) =>
   new Promise<void>((resolve) => window.setTimeout(resolve, milliseconds));
+
+const actionMenuItems = actionMenuItemsFor(PET_CHARACTER);
+const rootMenuItems = rootMenuItemsFor(PET_CHARACTER);
 
 export default function App() {
   const [action, setAction] = useState(PetAction.IDLE_STAND);
@@ -83,34 +87,6 @@ export default function App() {
   const compactSize = useRef<Size>({ width: 216, height: 216 });
   const windowModeRef = useRef<PetWindowMode>("compact");
   const menuRequest = useRef(0);
-  const menuOpen = useRef(false);
-  const dragging = useRef(false);
-
-  useEffect(() => {
-    if (import.meta.env.DEV || !("__TAURI_INTERNALS__" in window)) return;
-    const controller = new AbortController();
-    const backend: UpdateBackend = {
-      prepare: () => invoke<UpdateMetadata | null>("prepare_update"),
-      idleSeconds: () => invoke<number>("system_idle_seconds"),
-      install: () => invoke("install_pending_update"),
-    };
-    void runAutomaticUpdater({
-      backend,
-      isBusy: () => menuOpen.current || dragging.current || foodActive.current,
-      onBeforeInstall: () => {
-        active.current?.abort();
-        void hideSeatTargetBubble();
-        setSeat(null);
-        setAction(PetAction.IDLE_STAND);
-      },
-      onError: (error) => console.error("自动更新失败，将在下个周期重试", error),
-      signal: controller.signal,
-      sleep: delay,
-    }).catch((error) => {
-      if (!controller.signal.aborted) console.error("自动更新调度失败", error);
-    });
-    return () => controller.abort();
-  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -131,6 +107,7 @@ export default function App() {
     };
 
     const seatSequence = async (searchAction: PetAction = PetAction.SEARCH_SEAT) => {
+      if (!isActionSupported(PET_CHARACTER, searchAction)) return;
       const mode: SeatSearchMode | null = seatSearchModeForAction(searchAction);
       if (!mode) return;
       let target: DesktopSeatTarget | null = null;
@@ -241,7 +218,7 @@ export default function App() {
             await delay(actionDurationMs(current), signal);
             if (isCurrent() && shouldClearSeatAfterAction(automatic, current)) setSeat(null);
           }
-          current = nextAction(current);
+          current = nextAction(PET_CHARACTER, current);
         } catch (error) {
           if (signal.aborted) throw error;
           console.error("宠物动作失败，恢复站立后继续调度", error);
@@ -275,7 +252,6 @@ export default function App() {
   const closeMenu = () => {
     if (menuPoint === null && windowModeRef.current !== "interaction") return;
     menuRequest.current += 1;
-    menuOpen.current = false;
     setMenuPoint(null);
     void applyWindowMode("compact").then(() => {
       if (!foodActive.current) setRevision((value) => value + 1);
@@ -284,7 +260,6 @@ export default function App() {
 
   const openMenu = (point: Point) => {
     if (foodActive.current) return;
-    menuOpen.current = true;
     const request = ++menuRequest.current;
     dragResume.current = dragResumeAction(automatic, action, manual);
     active.current?.abort();
@@ -297,8 +272,8 @@ export default function App() {
 
   const selectMode = (value: ActionMenuValue) => {
     if (foodActive.current) return;
+    if (value !== "AUTO" && !isActionSupported(PET_CHARACTER, value)) return;
     menuRequest.current += 1;
-    menuOpen.current = false;
     setMenuPoint(null);
     active.current?.abort();
     void hideSeatTargetBubble();
@@ -341,25 +316,30 @@ export default function App() {
   };
 
   const chooseFood = async (kind: FoodPickerKind): Promise<void> => {
+    if (!isActionSupported(PET_CHARACTER, PetAction.LOOK_AT_FILE)) return;
     if (!beginFoodActivity(foodActive)) return Promise.resolve();
     menuRequest.current += 1;
-    menuOpen.current = false;
     dragResume.current = null;
     setMenuPoint(null);
     active.current?.abort();
     void hideSeatTargetBubble();
     setSeat(null);
     await applyWindowMode("compact");
-    return runFoodSelection(kind, foodFlowRef, { ...foodEffects, pick: pickFood });
+    return runFoodSelection(PET_CHARACTER, kind, foodFlowRef, {
+      ...foodEffects,
+      pick: pickFood,
+    });
   };
 
   const decideFood = (decision: "confirm" | "cancel") => {
-    void runFoodDecision(decision, foodFlowRef, { ...foodEffects, trash: trashFood });
+    void runFoodDecision(PET_CHARACTER, decision, foodFlowRef, {
+      ...foodEffects,
+      trash: trashFood,
+    });
   };
 
   const dragStart = () => {
     if (!shouldResumeAfterDrag(foodActive.current)) return;
-    dragging.current = true;
     dragResume.current = dragResumeAction(automatic, action, manual);
     active.current?.abort();
     void hideSeatTargetBubble();
@@ -370,7 +350,6 @@ export default function App() {
     } catch (error) {
       console.error("拖动后窗口归位失败", error);
     } finally {
-      dragging.current = false;
       if (shouldResumeAfterDrag(foodActive.current)) setRevision((value) => value + 1);
     }
   };
@@ -380,6 +359,7 @@ export default function App() {
       <div className="pet-stage">
         {shouldRenderSeatMarker(seat) && seat && <SeatIcon kind={seat.kind} />}
         <PetRenderer
+          displayName={PET_CHARACTER.displayName}
           dragDisabled={windowMode === "interaction" || foodActive.current}
           onBodyContextMenu={openMenu}
           onDragEnd={dragEnd}
@@ -388,7 +368,7 @@ export default function App() {
             compactSize.current = size;
             return setPetWindowLayout(size, windowModeRef.current);
           }}
-          pose={poseForAction(action, direction)}
+          pose={poseForAction(PET_CHARACTER, action, direction)}
           scale={1}
         />
         <FoodInteraction
@@ -399,11 +379,14 @@ export default function App() {
       </div>
       {menuPoint && (
         <PetActionMenu
+          actionItems={actionMenuItems}
+          displayName={PET_CHARACTER.displayName}
           onClose={closeMenu}
           onChooseFood={chooseFood}
           onSelect={selectMode}
           point={fromBottomCenter(menuPoint, INTERACTION_WINDOW_SIZE)}
           selection={automatic ? "AUTO" : manual}
+          rootItems={rootMenuItems}
         />
       )}
     </main>

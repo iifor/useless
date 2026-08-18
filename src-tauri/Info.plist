@@ -3,6 +3,6 @@
 <plist version="1.0">
 <dict>
   <key>NSAppleEventsUsageDescription</key>
-  <string>UNO 仅在寻找桌面座位时读取 Finder 中桌面图标的位置。</string>
+  <string>桌宠仅在寻找桌面座位时读取 Finder 中桌面图标的位置。</string>
 </dict>
 </plist>

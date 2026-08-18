@@ -1,8 +1,8 @@
 [package]
-name = "black-shirt-companion"
-version = "0.1.2"
-description = "无用的病毒"
-authors = ["Black Shirt Companion"]
+name = "pet-desktop-engine"
+version = "0.1.0"
+description = "Shared desktop pet engine"
+authors = ["iifor"]
 edition = "2021"
 
 [build-dependencies]
@@ -16,7 +16,6 @@ trash = "5.2.6"
 tempfile = "3"
 tauri-plugin-dialog = "2"
 tauri-plugin-single-instance = "2"
-tauri-plugin-updater = "=2.10.1"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 core-foundation = "0.10"

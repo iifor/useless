@@ -56,7 +56,7 @@ pub fn position_for_slot(
 }
 
 #[cfg(windows)]
-pub fn claim_instance_slot() -> usize {
+pub fn claim_instance_slot(identifier: &str) -> usize {
     use std::{os::windows::ffi::OsStrExt, sync::OnceLock};
     use windows_sys::Win32::{
         Foundation::{CloseHandle, GetLastError, SetLastError, ERROR_ALREADY_EXISTS},
@@ -65,8 +65,9 @@ pub fn claim_instance_slot() -> usize {
 
     static SLOT: OnceLock<usize> = OnceLock::new();
     *SLOT.get_or_init(|| {
+        let prefix = mutex_prefix(identifier);
         for slot in 0..32 {
-            let name = format!(r"Local\UNO-Pet-Slot-{slot}");
+            let name = format!(r"{prefix}-{slot}");
             let wide_name: Vec<u16> = std::ffi::OsStr::new(&name)
                 .encode_wide()
                 .chain(Some(0))
@@ -89,8 +90,13 @@ pub fn claim_instance_slot() -> usize {
 }
 
 #[cfg(not(windows))]
-pub fn claim_instance_slot() -> usize {
+pub fn claim_instance_slot(_identifier: &str) -> usize {
     std::process::id() as usize % 32
+}
+
+#[cfg(any(windows, test))]
+pub fn mutex_prefix(identifier: &str) -> String {
+    format!(r"Local\Pet-{identifier}-Slot")
 }
 
 pub fn position_main_window(app: &tauri::AppHandle) -> Result<(), String> {
@@ -98,14 +104,14 @@ pub fn position_main_window(app: &tauri::AppHandle) -> Result<(), String> {
 
     let window = app
         .get_webview_window("main")
-        .ok_or_else(|| "找不到 UNO 主窗口".to_owned())?;
+        .ok_or_else(|| "找不到桌宠主窗口".to_owned())?;
     let monitor = window
         .current_monitor()
         .map_err(|error| error.to_string())?
         .or(window.primary_monitor().map_err(|error| error.to_string())?)
         .ok_or_else(|| "找不到可用显示器".to_owned())?;
     let position = position_for_slot(
-        claim_instance_slot(),
+        claim_instance_slot(&app.config().identifier),
         *monitor.work_area(),
         window.outer_size().map_err(|error| error.to_string())?,
     );
@@ -147,5 +153,14 @@ mod tests {
         assert!(position.y >= 0);
         assert!(position.x + window.width as i32 <= 1920);
         assert!(position.y + window.height as i32 <= 1040);
+    }
+
+    #[test]
+    fn mutex_prefixes_are_deterministic_and_distinct_per_bundle() {
+        assert_eq!(mutex_prefix("com.example.pet-one"), r"Local\Pet-com.example.pet-one-Slot");
+        assert_ne!(
+            mutex_prefix("com.example.pet-one"),
+            mutex_prefix("com.example.pet.one"),
+        );
     }
 }

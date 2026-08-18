@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "id": "uno-pangyu",
+  "displayName": "UNO PangYu",
+  "version": "0.1.0",
+  "bundleId": "com.iifor.uno-pangyu",
+  "description": "安静的汉服桌面宠物。",
+  "idlePoses": ["idle-stand", "idle-sit"],
+  "capabilities": ["desktop-seat", "file-eating"]
+}

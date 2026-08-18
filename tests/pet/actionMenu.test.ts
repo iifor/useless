@@ -2,41 +2,52 @@ import { expect, test } from "vitest";
 
 import { PetAction } from "../../src/pet/actions";
 import {
-  ACTION_MENU_ITEMS,
+  actionMenuItemsFor,
   clampMenuPosition,
   FILE_MENU_ITEMS,
   MANUAL_ACTIONS,
-  ROOT_MENU_ITEMS,
+  rootMenuItemsFor,
   submenuPlacement,
   submenuSide,
   submenuTop,
 } from "../../src/pet/actionMenu";
+import { fullCharacter, minimalCharacter, reducedCharacter } from "./characterFixtures";
 
 test("offers automatic mode and every manual action", () => {
-  expect(ACTION_MENU_ITEMS.map((item) => item.value)).toEqual([
+  const items = actionMenuItemsFor(fullCharacter);
+  expect(items.map((item) => item.value)).toEqual([
     "AUTO",
     ...MANUAL_ACTIONS,
   ]);
-  expect(ACTION_MENU_ITEMS.map((item) => item.value)).not.toContain(PetAction.LOOK_AT_FILE);
-  expect(ACTION_MENU_ITEMS.map((item) => item.value)).not.toContain(PetAction.ASK_CONFIRM);
-  expect(ACTION_MENU_ITEMS.map((item) => item.value)).not.toContain(PetAction.EAT_NORMAL);
-  expect(ACTION_MENU_ITEMS).toContainEqual({
+  expect(items.map((item) => item.value)).not.toContain(PetAction.LOOK_AT_FILE);
+  expect(items.map((item) => item.value)).not.toContain(PetAction.ASK_CONFIRM);
+  expect(items.map((item) => item.value)).not.toContain(PetAction.EAT_NORMAL);
+  expect(items.map((item) => item.label)).toContain("趴着");
+  expect(items.map((item) => item.label)).toContain("侧躺");
+  expect(items.map((item) => item.label)).not.toContain("睡觉");
+  expect(items).toContainEqual({
     value: PetAction.SEARCH_CURRENT_WINDOW,
     label: "坐到当前窗口",
   });
-  expect(ACTION_MENU_ITEMS).toContainEqual({
+  expect(items).toContainEqual({
     value: PetAction.SEARCH_DESKTOP_ICON,
     label: "寻找桌面图标",
   });
+  expect(actionMenuItemsFor(reducedCharacter).map((item) => item.label))
+    .not.toEqual(expect.arrayContaining(["趴着", "侧躺"]));
+  expect(actionMenuItemsFor(reducedCharacter).map((item) => item.label))
+    .toContain("寻找桌面座位");
+  expect(actionMenuItemsFor(minimalCharacter).map((item) => item.label))
+    .not.toContain("寻找桌面座位");
 });
 
 test("groups actions and food under nested root menu items", () => {
-  expect(ROOT_MENU_ITEMS.map((item) => item.id)).toEqual([
+  expect(rootMenuItemsFor(fullCharacter).map((item) => item.id)).toEqual([
     "actions",
     "files",
     "capabilities",
   ]);
-  expect(ACTION_MENU_ITEMS.map((item) => item.value)).toEqual([
+  expect(actionMenuItemsFor(fullCharacter).map((item) => item.value)).toEqual([
     "AUTO",
     ...MANUAL_ACTIONS,
   ]);

@@ -99,7 +99,9 @@ export function planWalkPath(
   scaleFactor: number,
 ): Point[] {
   const safeTarget = clampWindowTarget(target, workArea, windowSize, 0);
-  return pointDistance(current, safeTarget) <= 0.5 * scaleFactor ? [] : [safeTarget];
+  if (pointDistance(current, safeTarget) <= 0.5 * scaleFactor) return [];
+  if (current.x === safeTarget.x || current.y === safeTarget.y) return [safeTarget];
+  return [{ x: safeTarget.x, y: current.y }, safeTarget];
 }
 
 export const directionForMove = (current: Point, target: Point): Direction => {

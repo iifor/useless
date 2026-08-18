@@ -1,11 +1,11 @@
-import { PetAction, type Direction } from "./actions";
+import { PetAction, isActionSupported, type Direction } from "./actions";
+import type { CharacterManifest } from "./characterManifest";
 
 export type PetPose =
   | "idle-stand"
   | "idle-sit"
   | "idle-prone"
   | "idle-lie"
-  | "sleep-side"
   | "walk-slow-left"
   | "walk-slow-right"
   | "walk-slow-up"
@@ -32,7 +32,6 @@ export const PET_POSES = [
   "idle-sit",
   "idle-prone",
   "idle-lie",
-  "sleep-side",
   "walk-slow-left",
   "walk-slow-right",
   "walk-slow-up",
@@ -60,7 +59,6 @@ export const ANIMATIONS: Record<PetPose, AnimationSpec> = {
   "idle-sit": strip("/pet/extended-animations/idle-sit.png", 2),
   "idle-prone": strip("/pet/extended-animations/idle-prone.png", 1.5),
   "idle-lie": strip("/pet/extended-animations/idle-lie.png", 1.5),
-  "sleep-side": strip("/pet/extended-animations/sleep-side.png", 1),
   "walk-slow-left": strip("/pet/extended-animations/walk-slow-left.png", 5),
   "walk-slow-right": strip("/pet/extended-animations/walk-slow-right.png", 5),
   "walk-slow-up": strip("/pet/extended-animations/walk-slow-up.png", 5),
@@ -74,7 +72,33 @@ export const ANIMATIONS: Record<PetPose, AnimationSpec> = {
   "eat-normal": strip("/pet/extended-animations/eat-normal.png", 4),
 };
 
-export function poseForAction(action: PetAction, direction: Direction): PetPose {
+const ACTION_FOR_POSE: Record<PetPose, PetAction> = {
+  "idle-stand": PetAction.IDLE_STAND,
+  "idle-sit": PetAction.IDLE_SIT,
+  "idle-prone": PetAction.IDLE_PRONE,
+  "idle-lie": PetAction.IDLE_LIE,
+  "walk-slow-left": PetAction.WALK_SLOW,
+  "walk-slow-right": PetAction.WALK_SLOW,
+  "walk-slow-up": PetAction.WALK_SLOW,
+  "walk-slow-down": PetAction.WALK_SLOW,
+  "search-seat": PetAction.SEARCH_SEAT,
+  "search-current-window": PetAction.SEARCH_CURRENT_WINDOW,
+  "search-desktop-icon": PetAction.SEARCH_DESKTOP_ICON,
+  "seat-on-item": PetAction.SEAT_ON_ITEM,
+  "look-file": PetAction.LOOK_AT_FILE,
+  "ask-confirm": PetAction.ASK_CONFIRM,
+  "eat-normal": PetAction.EAT_NORMAL,
+};
+
+export const availablePoses = (character: CharacterManifest): PetPose[] =>
+  PET_POSES.filter((pose) => isActionSupported(character, ACTION_FOR_POSE[pose]));
+
+export function poseForAction(
+  character: CharacterManifest,
+  action: PetAction,
+  direction: Direction,
+): PetPose {
+  if (!isActionSupported(character, action)) return "idle-stand";
   switch (action) {
     case PetAction.IDLE_SIT: return "idle-sit";
     case PetAction.IDLE_PRONE: return "idle-prone";

@@ -21,6 +21,7 @@ import {
   type FoodFlow,
   type FoodTarget,
 } from "../../src/pet/foodFlow";
+import { fullCharacter, minimalCharacter } from "./characterFixtures";
 
 const target = {
   name: "food.txt",
@@ -72,8 +73,8 @@ test("locks confirmation before awaiting so a second confirmation cannot trash t
     wait: async (milliseconds: number) => { waits.push(milliseconds); },
   };
 
-  const first = runFoodDecision("confirm", { get current() { return current; }, set current(flow) { current = flow; } }, effects);
-  const second = runFoodDecision("confirm", { get current() { return current; }, set current(flow) { current = flow; } }, effects);
+  const first = runFoodDecision(fullCharacter, "confirm", { get current() { return current; }, set current(flow) { current = flow; } }, effects);
+  const second = runFoodDecision(fullCharacter, "confirm", { get current() { return current; }, set current(flow) { current = flow; } }, effects);
 
   expect(trashRequests).toBe(1);
   expect(current.stage).toBe("trashing");
@@ -93,7 +94,7 @@ test("cancel performs fake eating and never sends a trash request", async () => 
   const actions: PetAction[] = [];
   const waits: number[] = [];
 
-  await runFoodDecision("cancel", {
+  await runFoodDecision(fullCharacter, "cancel", {
     get current() { return current; },
     set current(flow) { current = flow; },
   }, {
@@ -118,7 +119,7 @@ test("trash failure shows an error before finishing and never plays successful e
   const actions: PetAction[] = [];
   const waits: number[] = [];
 
-  await expect(runFoodDecision("confirm", {
+  await expect(runFoodDecision(fullCharacter, "confirm", {
     get current() { return current; },
     set current(flow) { current = flow; },
   }, {
@@ -142,7 +143,7 @@ test("picker cancellation resumes without changing the food flow", async () => {
   const actions: PetAction[] = [];
   const waits: number[] = [];
 
-  await runFoodSelection("file", {
+  await runFoodSelection(fullCharacter, "file", {
     get current() { return current; },
     set current(flow) { current = flow; },
   }, {
@@ -167,7 +168,7 @@ test("selected food looks at the target before asking for confirmation", async (
   const actions: PetAction[] = [];
   const waits: number[] = [];
 
-  await runFoodSelection("file", {
+  await runFoodSelection(fullCharacter, "file", {
     get current() { return current; },
     set current(flow) { current = flow; },
   }, {
@@ -192,7 +193,7 @@ test("rejected food inspection shows an error for two seconds and resumes", asyn
   const actions: PetAction[] = [];
   const waits: number[] = [];
 
-  await expect(runFoodSelection("folder", {
+  await expect(runFoodSelection(fullCharacter, "folder", {
     get current() { return current; },
     set current(flow) { current = flow; },
   }, {
@@ -294,4 +295,33 @@ test("menu choice consumes a rejected async callback", async () => {
   } finally {
     log.mockRestore();
   }
+});
+
+test("disabled file eating refuses internal selection and decision flows", async () => {
+  const pick = vi.fn(async () => target);
+  const trash = vi.fn(async () => undefined);
+  const finishSelection = vi.fn();
+  const finishDecision = vi.fn();
+  const selectionFlow = { current: finishFood() };
+  const decisionFlow = { current: advanceToConfirmation(beginFood(target)) };
+
+  await runFoodSelection(minimalCharacter, "file", selectionFlow, {
+    finish: finishSelection,
+    pick,
+    setAction: vi.fn(),
+    setFlow: vi.fn(),
+    wait: vi.fn(async () => undefined),
+  });
+  await runFoodDecision(minimalCharacter, "confirm", decisionFlow, {
+    finish: finishDecision,
+    setAction: vi.fn(),
+    setFlow: vi.fn(),
+    trash,
+    wait: vi.fn(async () => undefined),
+  });
+
+  expect(pick).not.toHaveBeenCalled();
+  expect(trash).not.toHaveBeenCalled();
+  expect(finishSelection).toHaveBeenCalledOnce();
+  expect(finishDecision).toHaveBeenCalledOnce();
 });

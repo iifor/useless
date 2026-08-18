@@ -1,47 +1,56 @@
-# 无用 U·N·O
+# 通用桌宠引擎
 
-Useless 它的存在没什么大用，既不能帮你赚钱也不能处理工作，但它在这里，就是最大的用处。
+React/Tauri/Rust 行为引擎由所有角色共用；人物图片、动画和应用图标按角色独立存放，不能跨角色复用。当前支持：
 
-## 正式发布
+- `uno`：站、坐、趴、侧躺；
+- `uno-pangyu`、`uno-yan`：站、坐；
+- 三个角色都启用桌面座位和文件交互能力。
 
-`pnpm release` 只负责检查仓库、选择 `major / minor / patch`、同步版本、运行测试、创建发布提交与标签，并原子推送 `master` 和标签。GitHub Actions 随后构建并发布 macOS Universal DMG、Windows x64 NSIS 和自动更新文件。
+运行时统一将人物可见长边归一化为 `119px`。本版本不支持应用内换肤，也不包含自动更新。
 
-首次启用前，在 GitHub 仓库 Settings → Secrets and variables → Actions 中配置：
-
-- Secrets：`TAURI_SIGNING_PRIVATE_KEY`、`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`、`APPLE_CERTIFICATE`、`APPLE_CERTIFICATE_PASSWORD`、`APPLE_API_ISSUER`、`APPLE_API_KEY`、`APPLE_API_PRIVATE_KEY_BASE64`、`AZURE_CLIENT_ID`、`AZURE_CLIENT_SECRET`、`AZURE_TENANT_ID`
-- Variables：`TAURI_UPDATER_PUBLIC_KEY`、`APPLE_SIGNING_IDENTITY`、`AZURE_ARTIFACT_SIGNING_ENDPOINT`、`AZURE_ARTIFACT_SIGNING_ACCOUNT`、`AZURE_ARTIFACT_SIGNING_PROFILE`
-
-Updater 密钥只生成一次：
+## 校验、开发与打包
 
 ```bash
-pnpm tauri signer generate -w /安全的离线目录/uno-updater.key
+pnpm install --frozen-lockfile
+pnpm pet:validate --all
+pnpm pet:dev uno-yan
+pnpm pet:build uno-yan -- --debug
 ```
 
-私钥内容放入 `TAURI_SIGNING_PRIVATE_KEY`，对应公钥内容放入 `TAURI_UPDATER_PUBLIC_KEY`。私钥和密码必须离线备份，不能提交到 Git。
-
-发布命令：
+macOS DMG 示例：
 
 ```bash
-pnpm release
+pnpm pet:build uno -- --bundles dmg --no-sign
 ```
 
-脚本要求当前分支为 `master`、工作树干净、`origin` 为 `https://github.com/iifor/useless.git`。构建检查失败会恢复版本文件；如果 atomic push 失败，本地发布提交和标签会保留，可修复网络或权限后重试：
-
-```bash
-git push --atomic origin master vX.Y.Z
-```
-
-`0.2.0` 是首个包含 Updater 的基线版本，需要用户手工安装一次；从 `0.2.1` 开始，Release 版会在启动 15 秒后检查更新，之后每 6 小时检查。更新下载并验签后，系统空闲 5 分钟且宠物没有交互时自动安装并重启。Debug 构建不检查更新。
-## Windows 本地构建
-
-前置条件：Node.js 22、pnpm 11、Rust `1.86.0-x86_64-pc-windows-msvc`，以及安装了“使用 C++ 的桌面开发”的 Visual Studio 2022 Build Tools。
+Windows x64 NSIS 示例（需在 Windows 上实际构建、运行和验收）：
 
 ```powershell
-pnpm install --frozen-lockfile
-pnpm build:windows
+pnpm pet:build uno-pangyu -- --target x86_64-pc-windows-msvc --bundles nsis --no-sign
 ```
 
-构建完成后生成：
+## 角色包约定
 
-- `release/UNO.exe`：便携版。
-- `release/UNO-Setup.exe`：未签名安装包，Windows 可能显示安全提醒。
+角色位于 `characters/<id>/`：
+
+```text
+character.json
+canonical-base.png              # 有原始 canonical 时保留
+pet/spritesheet.webp            # 标准 v2 atlas，必须包含 idle-stand
+pet/extended-animations/*.png   # 四帧横向 RGBA strip
+icons/icon.png
+icons/icon.icns
+icons/icon.ico
+qa/                             # 精简 QA 证据
+```
+
+所有角色必须提供 `walk-slow-left/right/up/down`。`idlePoses` 声明额外待机素材；`desktop-seat` 要求 `search-seat`、`search-current-window`、`search-desktop-icon`、`seat-on-item`；`file-eating` 要求 `look-file`、`ask-confirm`、`eat-normal`。帧数、FPS、布局和动作逻辑由引擎固定，不写进角色配置。
+
+## 新增角色
+
+1. 使用 `hatch-pet` 从参考图生成并 QA canonical、标准 v2 atlas 和该角色启用能力所需的扩展动作。
+2. 按上述目录写入素材、图标、精简 QA 证据和 `character.json`。
+3. 运行 `pnpm pet:validate <id>`。
+4. 运行 `pnpm pet:dev <id>` 或 `pnpm pet:build <id> -- <Tauri 参数>`。
+
+只有增加全新交互能力时才修改共享引擎；新增已有能力范围内的角色只增加角色包。
