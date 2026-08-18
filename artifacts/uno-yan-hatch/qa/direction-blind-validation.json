@@ -4,7 +4,7 @@
   "warnings": [
     "horizontal-1 A classified screen-right; expected screen-left",
     "horizontal-1 A and B were classified as the same horizontal direction",
-    "horizontal-7 A horizontal axis is ambiguous",
+    "horizontal-6 B horizontal axis is ambiguous",
     "vertical-4 B vertical axis is ambiguous",
     "vertical-7 A vertical axis is ambiguous"
   ],
@@ -107,10 +107,10 @@
         "pass": true
       },
       "B": {
-        "observed": "screen-right",
+        "observed": "ambiguous",
         "expected": "screen-right",
         "source_direction": "135",
-        "pass": true
+        "pass": false
       }
     },
     {
@@ -118,10 +118,10 @@
       "axis": "horizontal",
       "gate": "review",
       "A": {
-        "observed": "ambiguous",
+        "observed": "screen-left",
         "expected": "screen-left",
         "source_direction": "202.5",
-        "pass": false
+        "pass": true
       },
       "B": {
         "observed": "screen-right",

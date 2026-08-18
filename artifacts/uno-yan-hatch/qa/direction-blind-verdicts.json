@@ -10,7 +10,8 @@
           "screen-right": 3
         },
         "B": {
-          "screen-right": 3
+          "screen-right": 2,
+          "screen-left": 1
         }
       }
     },
@@ -73,6 +74,23 @@
     {
       "pair": "horizontal-6",
       "A": "screen-left",
+      "B": "ambiguous",
+      "reason": "strict majority of independent blind reviews",
+      "votes": {
+        "A": {
+          "screen-left": 2,
+          "ambiguous": 1
+        },
+        "B": {
+          "screen-left": 1,
+          "ambiguous": 1,
+          "screen-right": 1
+        }
+      }
+    },
+    {
+      "pair": "horizontal-7",
+      "A": "screen-left",
       "B": "screen-right",
       "reason": "strict majority of independent blind reviews",
       "votes": {
@@ -81,22 +99,8 @@
           "ambiguous": 1
         },
         "B": {
-          "screen-right": 3
-        }
-      }
-    },
-    {
-      "pair": "horizontal-7",
-      "A": "ambiguous",
-      "B": "screen-right",
-      "reason": "strict majority of independent blind reviews",
-      "votes": {
-        "A": {
           "screen-left": 1,
-          "ambiguous": 2
-        },
-        "B": {
-          "screen-right": 3
+          "screen-right": 2
         }
       }
     },
@@ -192,11 +196,11 @@
       "reason": "strict majority of independent blind reviews",
       "votes": {
         "A": {
-          "down": 1,
-          "ambiguous": 2
+          "ambiguous": 3
         },
         "B": {
-          "up": 3
+          "ambiguous": 1,
+          "up": 2
         }
       }
     }

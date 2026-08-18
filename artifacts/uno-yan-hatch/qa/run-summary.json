@@ -9,6 +9,8 @@
   "direction_sheet": "qa/look-directions.png",
   "direction_semantics": "qa/direction-semantics.json",
   "blind_direction_validation": "qa/direction-blind-validation.json",
+  "blind_direction_result": "pass_with_intermediate_review_warnings",
+  "blind_review_resolution": null,
   "continuity": "qa/look-continuity.json",
   "review": "qa/review.json",
   "final_visual_qa": "qa/final-visual-qa.json",
