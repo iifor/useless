@@ -1,1 +1,18 @@
-{"pairs":[{"pair":"horizontal-1","A":"screen-right","B":"screen-right","reason":"Both faces and pupils visibly angle toward screen-right."},{"pair":"horizontal-2","A":"screen-left","B":"screen-right","reason":"A's nose and gaze point left; B's point right."},{"pair":"horizontal-3","A":"screen-left","B":"screen-right","reason":"Clear opposing head turns and sideward gazes."},{"pair":"horizontal-4","A":"screen-left","B":"screen-right","reason":"A presents a left-facing profile; B presents a right-facing profile."},{"pair":"horizontal-5","A":"screen-left","B":"screen-right","reason":"The bowed faces remain visibly turned left in A and right in B."},{"pair":"horizontal-6","A":"screen-left","B":"screen-right","reason":"A's face and pupils lean left; B's bowed face turns right."},{"pair":"horizontal-7","A":"screen-left","B":"screen-right","reason":"A's facial features angle left; B's nose and head angle right."},{"pair":"vertical-1","A":"down","B":"up","reason":"A has a tucked chin and lowered gaze; B lifts chin and pupils."},{"pair":"vertical-2","A":"up","B":"down","reason":"A looks above eye level; B bows the head and gaze."},{"pair":"vertical-3","A":"up","B":"down","reason":"A's chin and eyes rise; B's chin is tucked with eyes lowered."},{"pair":"vertical-4","A":"down","B":"ambiguous","reason":"A visibly bows downward; B's head and gaze appear approximately level."},{"pair":"vertical-5","A":"down","B":"up","reason":"A's pupils and chin lower; B tilts the face upward."},{"pair":"vertical-6","A":"up","B":"down","reason":"A lifts the face and gaze; B looks downward with a bowed head."},{"pair":"vertical-7","A":"ambiguous","B":"up","reason":"A's profile appears vertically level; B's face and pupils angle upward."}]}
+{
+  "pairs": [
+    {"pair":"horizontal-1","A":"screen-right","B":"screen-right","reason":"classification supplied by isolated reviewer"},
+    {"pair":"horizontal-2","A":"screen-left","B":"screen-right","reason":"classification supplied by isolated reviewer"},
+    {"pair":"horizontal-3","A":"screen-right","B":"screen-left","reason":"classification supplied by isolated reviewer"},
+    {"pair":"horizontal-4","A":"screen-right","B":"screen-left","reason":"classification supplied by isolated reviewer"},
+    {"pair":"horizontal-5","A":"screen-left","B":"screen-right","reason":"classification supplied by isolated reviewer"},
+    {"pair":"horizontal-6","A":"ambiguous","B":"screen-right","reason":"classification supplied by isolated reviewer"},
+    {"pair":"horizontal-7","A":"ambiguous","B":"screen-right","reason":"classification supplied by isolated reviewer"},
+    {"pair":"vertical-1","A":"up","B":"down","reason":"classification supplied by isolated reviewer"},
+    {"pair":"vertical-2","A":"down","B":"up","reason":"classification supplied by isolated reviewer"},
+    {"pair":"vertical-3","A":"down","B":"up","reason":"classification supplied by isolated reviewer"},
+    {"pair":"vertical-4","A":"ambiguous","B":"down","reason":"classification supplied by isolated reviewer"},
+    {"pair":"vertical-5","A":"down","B":"up","reason":"classification supplied by isolated reviewer"},
+    {"pair":"vertical-6","A":"down","B":"up","reason":"classification supplied by isolated reviewer"},
+    {"pair":"vertical-7","A":"ambiguous","B":"up","reason":"classification supplied by isolated reviewer"}
+  ]
+}

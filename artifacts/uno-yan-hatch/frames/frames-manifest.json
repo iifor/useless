@@ -83,7 +83,7 @@
         "/Users/wuqingfu/Desktop/hatch-pet/desktop-app/.worktrees/uno-yan/artifacts/uno-yan-hatch/frames/failed/06.png",
         "/Users/wuqingfu/Desktop/hatch-pet/desktop-app/.worktrees/uno-yan/artifacts/uno-yan-hatch/frames/failed/07.png"
       ],
-      "method": "components"
+      "method": "stable-slots"
     },
     {
       "state": "waiting",

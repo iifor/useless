@@ -1,5 +1,6 @@
 {
   "ok": true,
+  "status": "pass_with_reviewed_warnings",
   "spriteVersionNumber": 2,
   "run_dir": "artifacts/uno-yan-hatch",
   "spritesheet": "final/spritesheet-extended.webp",
@@ -14,5 +15,8 @@
   "continuity": "qa/look-continuity.json",
   "review": "qa/review.json",
   "final_visual_qa": "qa/final-visual-qa.json",
-  "package": "package"
+  "final_visual_qa_result": "warning_accepted_no_repairs",
+  "package": "package",
+  "package_validation": "package/validation.json",
+  "pending": []
 }

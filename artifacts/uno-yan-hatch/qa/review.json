@@ -13,7 +13,9 @@
     "review"
   ],
   "errors": [],
-  "warnings": [],
+  "warnings": [
+    "failed used extraction method stable-slots; confirm motion playback remains stable and unclipped"
+  ],
   "rows": [
     {
       "state": "idle",
@@ -539,35 +541,67 @@
       "state": "failed",
       "expected_frames": 8,
       "actual_frames": 8,
-      "extraction_method": "components",
+      "extraction_method": "stable-slots",
       "ok": true,
       "errors": [],
-      "warnings": [],
+      "warnings": [
+        "failed used extraction method stable-slots; confirm motion playback remains stable and unclipped"
+      ],
       "frames": [
         {
           "index": 0,
           "file": "/Users/wuqingfu/Desktop/hatch-pet/desktop-app/.worktrees/uno-yan/artifacts/uno-yan-hatch/frames/failed/00.png",
           "width": 192,
           "height": 208,
-          "nontransparent_pixels": 13552,
+          "nontransparent_pixels": 13150,
           "bbox": [
-            48,
+            47,
             5,
-            143,
+            145,
             203
           ],
           "edge_pixels": 0,
-          "chroma_adjacent_pixels": 140
+          "chroma_adjacent_pixels": 126
         },
         {
           "index": 1,
           "file": "/Users/wuqingfu/Desktop/hatch-pet/desktop-app/.worktrees/uno-yan/artifacts/uno-yan-hatch/frames/failed/01.png",
           "width": 192,
           "height": 208,
-          "nontransparent_pixels": 13525,
+          "nontransparent_pixels": 12786,
+          "bbox": [
+            48,
+            6,
+            144,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 118
+        },
+        {
+          "index": 2,
+          "file": "/Users/wuqingfu/Desktop/hatch-pet/desktop-app/.worktrees/uno-yan/artifacts/uno-yan-hatch/frames/failed/02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 12455,
           "bbox": [
             49,
-            5,
+            7,
+            143,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 114
+        },
+        {
+          "index": 3,
+          "file": "/Users/wuqingfu/Desktop/hatch-pet/desktop-app/.worktrees/uno-yan/artifacts/uno-yan-hatch/frames/failed/03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 12458,
+          "bbox": [
+            49,
+            11,
             143,
             203
           ],
@@ -575,94 +609,64 @@
           "chroma_adjacent_pixels": 125
         },
         {
-          "index": 2,
-          "file": "/Users/wuqingfu/Desktop/hatch-pet/desktop-app/.worktrees/uno-yan/artifacts/uno-yan-hatch/frames/failed/02.png",
-          "width": 192,
-          "height": 208,
-          "nontransparent_pixels": 13230,
-          "bbox": [
-            49,
-            5,
-            142,
-            203
-          ],
-          "edge_pixels": 0,
-          "chroma_adjacent_pixels": 151
-        },
-        {
-          "index": 3,
-          "file": "/Users/wuqingfu/Desktop/hatch-pet/desktop-app/.worktrees/uno-yan/artifacts/uno-yan-hatch/frames/failed/03.png",
-          "width": 192,
-          "height": 208,
-          "nontransparent_pixels": 13759,
-          "bbox": [
-            49,
-            5,
-            143,
-            203
-          ],
-          "edge_pixels": 0,
-          "chroma_adjacent_pixels": 151
-        },
-        {
           "index": 4,
           "file": "/Users/wuqingfu/Desktop/hatch-pet/desktop-app/.worktrees/uno-yan/artifacts/uno-yan-hatch/frames/failed/04.png",
           "width": 192,
           "height": 208,
-          "nontransparent_pixels": 15308,
+          "nontransparent_pixels": 11262,
           "bbox": [
-            44,
-            5,
-            147,
+            50,
+            30,
+            142,
             203
           ],
           "edge_pixels": 0,
-          "chroma_adjacent_pixels": 152
+          "chroma_adjacent_pixels": 102
         },
         {
           "index": 5,
           "file": "/Users/wuqingfu/Desktop/hatch-pet/desktop-app/.worktrees/uno-yan/artifacts/uno-yan-hatch/frames/failed/05.png",
           "width": 192,
           "height": 208,
-          "nontransparent_pixels": 20425,
+          "nontransparent_pixels": 9393,
           "bbox": [
-            32,
-            5,
-            160,
+            51,
+            66,
+            141,
             203
           ],
           "edge_pixels": 0,
-          "chroma_adjacent_pixels": 233
+          "chroma_adjacent_pixels": 81
         },
         {
           "index": 6,
           "file": "/Users/wuqingfu/Desktop/hatch-pet/desktop-app/.worktrees/uno-yan/artifacts/uno-yan-hatch/frames/failed/06.png",
           "width": 192,
           "height": 208,
-          "nontransparent_pixels": 25476,
+          "nontransparent_pixels": 8619,
           "bbox": [
-            14,
-            5,
-            178,
+            47,
+            86,
+            145,
             203
           ],
           "edge_pixels": 0,
-          "chroma_adjacent_pixels": 380
+          "chroma_adjacent_pixels": 95
         },
         {
           "index": 7,
           "file": "/Users/wuqingfu/Desktop/hatch-pet/desktop-app/.worktrees/uno-yan/artifacts/uno-yan-hatch/frames/failed/07.png",
           "width": 192,
           "height": 208,
-          "nontransparent_pixels": 18497,
+          "nontransparent_pixels": 6396,
           "bbox": [
-            5,
-            39,
-            187,
-            169
+            42,
+            124,
+            150,
+            203
           ],
           "edge_pixels": 0,
-          "chroma_adjacent_pixels": 247
+          "chroma_adjacent_pixels": 65
         }
       ]
     },

@@ -1,21 +1,22 @@
 {
   "ok": true,
   "row": "look-row-10",
+  "source_sha256": "d2a89281c5ba03a333048f2a15308fdbf0f0cb72875da74c29a984cf9e8b0948",
   "source_order": ["180", "202.5", "225", "247.5", "270", "292.5", "315", "337.5"],
-  "registration": {"scale": 0.37858508604206503, "shared_with_row_9": true, "cell_size": [192, 208], "pose_groups_recovered": 8},
+  "registration": {"scale": 0.42127659574468085, "shared_within_coherent_row": true, "target_geometry_source": "frames/idle/00.png", "cell_size": [192, 208], "pose_groups_recovered": 8},
   "edge_check": {"verdict": "pass", "failure_threshold": 24},
   "directions": [
     {"direction":"180","expected":"down","verdict":"pass","observed":"Centered eyes, chin, and head point down."},
     {"direction":"202.5","expected":"down-left","verdict":"pass","observed":"Downward pitch remains while face begins turning screen-left."},
     {"direction":"225","expected":"down-left","verdict":"pass","observed":"Balanced down and screen-left cues."},
     {"direction":"247.5","expected":"down-left","verdict":"pass","observed":"Screen-left turn strengthens while downward cue eases."},
-    {"direction":"270","expected":"left","verdict":"pass","observed":"Nose, face, and head point unmistakably screen-left."},
+    {"direction":"270","expected":"left","verdict":"pass","observed":"Nose, face surface, pupils, and head point unmistakably toward viewer screen-left, visibly opposing approved 090."},
     {"direction":"292.5","expected":"up-left","verdict":"pass","observed":"Left profile remains while eyes and chin begin lifting."},
     {"direction":"315","expected":"up-left","verdict":"pass","observed":"Balanced up and screen-left cues."},
     {"direction":"337.5","expected":"up-left","verdict":"pass","observed":"Predominantly up with a residual screen-left turn, one step before 000."}
   ],
-  "continuity": {"verdict":"pass","reviewed_pairs":["157.5->180","180->202.5","202.5->225","225->247.5","247.5->270","270->292.5","292.5->315","315->337.5","337.5->000"],"observed":"The labeled normal-size loop progresses clockwise without reversal, visible snap, identity change, attachment break, clipping, or alpha holes. Metric outliers are retained as review warnings; visual review confirms continuous pose-family transitions."},
+  "continuity": {"verdict":"pass","reviewed_pairs":["157.5->180","180->202.5","202.5->225","225->247.5","247.5->270","270->292.5","292.5->315","315->337.5","337.5->000"],"observed":"The complete semantic-correct source was normalized once with one shared scale and one neutral lower-body anchor/baseline. The labeled normal-size loop progresses clockwise without reversal, visible scale or center snap, identity change, attachment break, clipping, or alpha holes. 157.5->180 is 1.05 area ratio/3.0px center shift; 337.5->000 is 1.15/2.5px."},
   "identity": {"verdict":"pass","observed":"Canonical face, outfit, body registration, and asymmetric physical-side clips remain coherent."},
   "errors": [],
-  "warnings": ["Continuity metrics flag local differences at 157.5->180, 225->247.5, 270->292.5, and 337.5->000; labeled normal-size review finds no visible hard failure."]
+  "warnings": ["Continuity metrics retain local diff-only review warnings at 225->247.5, 270->292.5, and 315->337.5; fresh blind and independent final visual QA confirmed no snap, wrong quadrant, alpha hole, registration failure, or required repair."]
 }
