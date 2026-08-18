@@ -72,6 +72,7 @@ export async function validateCharacterPackage(charactersRoot, id) {
   const packageRoot = join(charactersRoot, id);
   const manifestFile = join(packageRoot, "manifest.json");
   const manifestPath = pathLabel(charactersRoot, manifestFile);
+  const stripsRoot = join(packageRoot, "pet", "extended-animations");
   const errors = [];
   let manifest;
 
@@ -102,7 +103,7 @@ export async function validateCharacterPackage(charactersRoot, id) {
     ...declaredIdlePoses.filter((pose) => pose !== "idle-stand"),
     ...declaredCapabilities.flatMap((capability) => capabilityStrips[capability]),
   ].map((strip) => {
-    const path = join(packageRoot, "pet", `${strip}.png`);
+    const path = join(stripsRoot, `${strip}.png`);
     return validatePngStrip(path, errors, pathLabel(charactersRoot, path));
   }));
   await Promise.all(["icon.png", "icon.icns", "icon.ico"].map((icon) => {

@@ -55,6 +55,7 @@ function png({ signature = true, ihdrLength = 13, width = 4, height = 1, colorTy
 async function writePackage(root, id = "valid-pet", options = {}) {
   const packageRoot = join(root, "characters", id);
   const petRoot = join(packageRoot, "pet");
+  const stripsRoot = join(petRoot, options.flatStrips ? "" : "extended-animations");
   const iconsRoot = join(packageRoot, "icons");
   const value = manifest({ id, ...options.manifest });
   const strips = [
@@ -65,10 +66,11 @@ async function writePackage(root, id = "valid-pet", options = {}) {
   ];
 
   await mkdir(petRoot, { recursive: true });
+  await mkdir(stripsRoot, { recursive: true });
   await mkdir(iconsRoot, { recursive: true });
   await writeFile(join(packageRoot, "manifest.json"), JSON.stringify(value));
   await writeFile(join(petRoot, "spritesheet.webp"), "webp");
-  await Promise.all(strips.map((strip) => writeFile(join(petRoot, `${strip}.png`), png(options.png))));
+  await Promise.all(strips.map((strip) => writeFile(join(stripsRoot, `${strip}.png`), png(options.png))));
   await Promise.all([
     writeFile(join(iconsRoot, "icon.png"), "png"),
     writeFile(join(iconsRoot, "icon.icns"), "icns"),
@@ -148,10 +150,10 @@ describe("character packages", () => {
     const packageRoot = await writePackage(root, "valid-pet", {
       manifest: { capabilities: ["desktop-seat"] },
     });
-    await unlink(join(packageRoot, "pet", "search-seat.png"));
+    await unlink(join(packageRoot, "pet", "extended-animations", "search-seat.png"));
 
     await expect(validateCharacterPackage(join(root, "characters"), "valid-pet"))
-      .resolves.toEqual(expect.arrayContaining([expect.stringContaining("pet/search-seat.png") ]));
+      .resolves.toEqual(expect.arrayContaining([expect.stringContaining("pet/extended-animations/search-seat.png") ]));
   });
 
   test("does not require strips for disabled capabilities", async () => {
@@ -172,10 +174,20 @@ describe("character packages", () => {
   test("rejects a missing strip for an enabled optional idle pose", async () => {
     const root = await tempRoot();
     const packageRoot = await writePackage(root, "valid-pet", { manifest: { idlePoses: ["idle-stand", "idle-sit"] } });
-    await unlink(join(packageRoot, "pet", "idle-sit.png"));
+    await unlink(join(packageRoot, "pet", "extended-animations", "idle-sit.png"));
 
     await expect(validateCharacterPackage(join(root, "characters"), "valid-pet"))
-      .resolves.toEqual(expect.arrayContaining([expect.stringContaining("pet/idle-sit.png: missing")]));
+      .resolves.toEqual(expect.arrayContaining([expect.stringContaining("pet/extended-animations/idle-sit.png: missing")]));
+  });
+
+  test("requires strips under pet/extended-animations", async () => {
+    const root = await tempRoot();
+    await writePackage(root, "flat-pet", { flatStrips: true });
+    await writePackage(root, "nested-pet");
+
+    await expect(validateCharacterPackage(join(root, "characters"), "flat-pet"))
+      .resolves.toEqual(expect.arrayContaining([expect.stringContaining("pet/extended-animations/walk-slow-left.png: missing")]));
+    await expect(validateCharacterPackage(join(root, "characters"), "nested-pet")).resolves.toEqual([]);
   });
 
   test.each([
@@ -207,13 +219,13 @@ describe("character packages", () => {
     const valid = await writePackage(root, "valid-pet");
     const invalid = await writePackage(root, "broken-pet");
     await unlink(join(valid, "icons", "icon.ico"));
-    await unlink(join(invalid, "pet", "walk-slow-up.png"));
+    await unlink(join(invalid, "pet", "extended-animations", "walk-slow-up.png"));
 
     await expect(runCli(root, "--all")).resolves.toMatchObject({
       code: 1,
       stderr: expect.stringContaining("characters/valid-pet/icons/icon.ico"),
     });
     const result = await runCli(root, "--all");
-    expect(result.stderr).toContain("characters/broken-pet/pet/walk-slow-up.png");
+    expect(result.stderr).toContain("characters/broken-pet/pet/extended-animations/walk-slow-up.png");
   });
 });
