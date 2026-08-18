@@ -1,13 +1,13 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import { prepareCharacterBuild } from "./scripts/pet-build.mjs";
+import { stageCharacterPublic } from "./scripts/pet-build.mjs";
 
 const node = globalThis as typeof globalThis & {
   process: { cwd(): string; env: Record<string, string | undefined> };
 };
 
 export async function characterViteSettings(root: string, id: string) {
-  const { manifest, publicDir } = await prepareCharacterBuild(root, id);
+  const { manifest, publicDir } = await stageCharacterPublic(root, id);
   return { manifest, publicDir };
 }
 

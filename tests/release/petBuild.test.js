@@ -46,11 +46,15 @@ describe("character-selected build", () => {
 
   test("injects the exact selected manifest and staged public directory", async () => {
     const root = await tempProject();
+    const prepared = await prepareCharacterBuild(root, "uno-pangyu");
+    const marker = join(prepared.stageDir, "tauri-is-reading-this-file");
+    await writeFile(marker, "keep");
     const settings = await characterViteSettings(root, "uno-pangyu");
     expect(settings.manifest).toEqual(JSON.parse(await readFile(
       join(root, "characters/uno-pangyu/character.json"), "utf8",
     )));
     expect(settings.publicDir).toBe(join(root, ".pet-build/uno-pangyu/public"));
+    await expect(readFile(marker, "utf8")).resolves.toBe("keep");
   });
 
   test("recreates only the selected stage without cross-character leakage", async () => {

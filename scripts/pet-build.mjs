@@ -26,15 +26,11 @@ export async function loadCharacter(root, id) {
 export async function prepareCharacterBuild(root, id) {
   const manifest = await loadCharacter(root, id);
   const packageRoot = join(root, "characters", id);
-  const stageRoot = resolve(root, ".pet-build");
-  const stageDir = resolve(stageRoot, id);
-  if (dirname(stageDir) !== stageRoot) throw new Error(`不安全的构建目录: ${stageDir}`);
+  const { stageDir, publicDir } = buildPaths(root, id);
 
   await rm(stageDir, { recursive: true, force: true });
-  const publicDir = join(stageDir, "public");
   const iconsDir = join(stageDir, "icons");
-  await mkdir(publicDir, { recursive: true });
-  await cp(join(packageRoot, "pet"), join(publicDir, "pet"), { recursive: true });
+  await copyPet(packageRoot, publicDir);
   await cp(join(packageRoot, "icons"), iconsDir, { recursive: true });
 
   const infoPlistPath = join(stageDir, "Info.plist");
@@ -70,6 +66,14 @@ export async function prepareCharacterBuild(root, id) {
   return { manifest, stageDir, publicDir, iconsDir, infoPlistPath, tauriConfigPath, iconPaths };
 }
 
+export async function stageCharacterPublic(root, id) {
+  const manifest = await loadCharacter(root, id);
+  const { stageDir, publicDir } = buildPaths(root, id);
+  await rm(publicDir, { recursive: true, force: true });
+  await copyPet(join(root, "characters", id), publicDir);
+  return { manifest, stageDir, publicDir };
+}
+
 export function expectedWindowsArtifacts(manifest) {
   return {
     application: `${manifest.displayName}.exe`,
@@ -98,6 +102,18 @@ function spawnInherited(command, args, options) {
       ? resolvePromise()
       : reject(new Error(`${command} exited with code ${code}`)));
   });
+}
+
+function buildPaths(root, id) {
+  const stageRoot = resolve(root, ".pet-build");
+  const stageDir = resolve(stageRoot, id);
+  if (dirname(stageDir) !== stageRoot) throw new Error(`不安全的构建目录: ${stageDir}`);
+  return { stageDir, publicDir: join(stageDir, "public") };
+}
+
+async function copyPet(packageRoot, publicDir) {
+  await mkdir(publicDir, { recursive: true });
+  await cp(join(packageRoot, "pet"), join(publicDir, "pet"), { recursive: true });
 }
 
 function infoPlist(displayName) {
