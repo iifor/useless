@@ -1,4 +1,4 @@
-import { cp, mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { access, cp, mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -72,6 +72,19 @@ describe("character-selected build", () => {
     await expect(readFile(join(prepared.iconsDir, "icon.ico"))).resolves.toBeTruthy();
     await expect(readFile(join(prepared.stageDir, "canonical-base.png"))).rejects.toMatchObject({ code: "ENOENT" });
     await expect(readFile(join(prepared.stageDir, "qa/validation.json"))).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  test("stages assets only from the selected character package", async () => {
+    await expect(access("public/pet")).rejects.toMatchObject({ code: "ENOENT" });
+    await expect(access("artifacts")).rejects.toMatchObject({ code: "ENOENT" });
+    await expect(readdir("src-tauri/icons")).resolves.toEqual(["icon.png"]);
+
+    const root = await tempProject();
+    const prepared = await prepareCharacterBuild(root, "uno-pangyu");
+    await expect(readFile(join(prepared.publicDir, "pet/spritesheet.webp")))
+      .resolves.toEqual(await readFile("characters/uno-pangyu/pet/spritesheet.webp"));
+    await expect(readFile(join(prepared.iconsDir, "icon.icns")))
+      .resolves.toEqual(await readFile("characters/uno-pangyu/icons/icon.icns"));
   });
 
   test.each([

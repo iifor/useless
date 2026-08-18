@@ -4,19 +4,27 @@ import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 
 import { ANIMATIONS, availablePoses } from "../../src/pet/animations";
-import { reducedCharacter } from "./characterFixtures";
+
+const characterIds = ["uno", "uno-pangyu", "uno-yan"];
+
+const readCharacter = (id) => JSON.parse(readFileSync(
+  join(process.cwd(), "characters", id, "character.json"),
+  "utf8",
+));
 
 describe("pet animation assets", () => {
-  test("every configured asset exists and is non-empty", () => {
-    for (const pose of availablePoses(reducedCharacter)) {
-      const animation = ANIMATIONS[pose];
-      const asset = join(process.cwd(), "public", animation.source.replace(/^\//, ""));
-      expect(existsSync(asset), animation.source).toBe(true);
-      expect(statSync(asset).size, animation.source).toBeGreaterThan(0);
+  test("every character has every configured asset it can use", () => {
+    for (const id of characterIds) {
+      for (const pose of availablePoses(readCharacter(id))) {
+        const animation = ANIMATIONS[pose];
+        const asset = join(process.cwd(), "characters", id, animation.source.replace(/^\//, ""));
+        expect(existsSync(asset), `${id}${animation.source}`).toBe(true);
+        expect(statSync(asset).size, `${id}${animation.source}`).toBeGreaterThan(0);
+      }
     }
   });
 
-  test("keeps a shared superset while the staged reduced role omits optional idle assets", () => {
+  test("keeps a shared superset while reduced characters omit optional idle assets", () => {
     expect(Object.keys(ANIMATIONS)).toEqual([
       "idle-stand",
       "idle-sit",
@@ -34,13 +42,12 @@ describe("pet animation assets", () => {
       "ask-confirm",
       "eat-normal",
     ]);
-    for (const removed of ["idle-prone.png", "idle-lie.png", "sleep-side.png"]) {
-      expect(existsSync(join(process.cwd(), "public/pet/extended-animations", removed))).toBe(false);
+    for (const id of ["uno-pangyu", "uno-yan"]) {
+      for (const removed of ["idle-prone.png", "idle-lie.png", "sleep-side.png"]) {
+        expect(existsSync(join(
+          process.cwd(), "characters", id, "pet/extended-animations", removed,
+        ))).toBe(false);
+      }
     }
-    expect(
-      readFileSync("public/pet/spritesheet.webp").equals(
-        readFileSync("artifacts/uno-yan-hatch/package/spritesheet.webp"),
-      ),
-    ).toBe(true);
   });
 });
