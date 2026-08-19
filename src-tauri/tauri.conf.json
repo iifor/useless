@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "identifier": "com.iifor.pet-desktop-engine",
   "build": {
-    "beforeDevCommand": "pnpm dev",
+    "beforeDevCommand": "pnpm frontend:dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "pnpm build",
+    "beforeBuildCommand": "pnpm frontend:build",
     "frontendDist": "../dist"
   },
   "app": {

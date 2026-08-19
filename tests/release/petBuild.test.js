@@ -1,14 +1,14 @@
 import { access, cp, mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { PassThrough } from "node:stream";
 
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-import {
-  prepareCharacterBuild,
-  runPetCommand,
-} from "../../scripts/pet-build.mjs";
+import * as petBuild from "../../scripts/pet-build.mjs";
 import { characterViteSettings, requireCharacterId } from "../../vite.config.ts";
+
+const { prepareCharacterBuild, runPetCommand } = petBuild;
 
 const roots = [];
 
@@ -32,7 +32,6 @@ describe("character-selected build", () => {
   });
 
   test.each([
-    [[], "用法"],
     [["UNO"], "无效角色 id"],
     [["missing"], "未知角色"],
   ])("rejects %j before spawning", async (args, message) => {
@@ -40,6 +39,43 @@ describe("character-selected build", () => {
     await expect(runPetCommand({ root: process.cwd(), mode: "build", args, spawn }))
       .rejects.toThrow(message);
     expect(spawn).not.toHaveBeenCalled();
+  });
+
+  test("selects a character with arrow keys when no id is supplied", async () => {
+    expect(petBuild.selectCharacter).toBeTypeOf("function");
+    const root = await tempProject();
+    const input = new PassThrough();
+    const output = new PassThrough();
+    input.isTTY = true;
+    output.isTTY = true;
+    input.isRaw = false;
+    input.setRawMode = vi.fn((value) => { input.isRaw = value; });
+    const selected = petBuild.selectCharacter(root, { input, output });
+
+    input.write("\x1b[B");
+    input.write("\r");
+
+    await expect(selected).resolves.toBe("uno-pangyu");
+    expect(input.setRawMode).toHaveBeenNthCalledWith(1, true);
+    expect(input.setRawMode).toHaveBeenLastCalledWith(false);
+  });
+
+  test("uses the interactive selection before spawning when the id is omitted", async () => {
+    const root = await tempProject();
+    const spawn = vi.fn().mockResolvedValue(undefined);
+    await runPetCommand({
+      root,
+      mode: "dev",
+      args: [],
+      select: async () => "uno-yan",
+      spawn,
+    });
+
+    expect(spawn).toHaveBeenCalledWith(
+      process.execPath,
+      [join(root, "node_modules/@tauri-apps/cli/tauri.js"), "dev", "--config", expect.any(String)],
+      expect.objectContaining({ env: expect.objectContaining({ PET_CHARACTER: "uno-yan" }) }),
+    );
   });
 
   test("injects the exact selected manifest and staged public directory", async () => {
@@ -154,11 +190,20 @@ describe("character-selected build", () => {
       .rejects.toMatchObject({ code: "ENOENT" });
   });
 
-  test("exposes only the selected-character commands and keeps engine code role-neutral", async () => {
+  test("routes friendly commands through selection without recursive frontend hooks", async () => {
     const pkg = JSON.parse(await readFile("package.json", "utf8"));
     expect(pkg.scripts).toMatchObject({
+      "dev": "node scripts/pet-build.mjs dev",
+      "build": "node scripts/pet-build.mjs build",
       "pet:dev": "node scripts/pet-build.mjs dev",
       "pet:build": "node scripts/pet-build.mjs build",
+      "frontend:dev": "vite --port 1420",
+      "frontend:build": "tsc -b && vite build",
+    });
+    const tauri = JSON.parse(await readFile("src-tauri/tauri.conf.json", "utf8"));
+    expect(tauri.build).toMatchObject({
+      beforeDevCommand: "pnpm frontend:dev",
+      beforeBuildCommand: "pnpm frontend:build",
     });
     for (const legacy of ["dmg", "exe", "tauri:build", "build:windows", "dev:windows"]) {
       expect(pkg.scripts).not.toHaveProperty(legacy);

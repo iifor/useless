@@ -4,8 +4,10 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --port 1420",
-    "build": "tsc -b && vite build",
+    "dev": "node scripts/pet-build.mjs dev",
+    "build": "node scripts/pet-build.mjs build",
+    "frontend:dev": "vite --port 1420",
+    "frontend:build": "tsc -b && vite build",
     "test": "vitest run",
     "pet:validate": "node scripts/pet-validate.mjs",
     "pet:dev": "node scripts/pet-build.mjs dev",

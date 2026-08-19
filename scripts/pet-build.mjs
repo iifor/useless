@@ -1,6 +1,7 @@
 import { spawn as spawnChild } from "node:child_process";
-import { cp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
+import { emitKeypressEvents } from "node:readline";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { validateCharacterPackage } from "./pet-validate.mjs";
@@ -71,10 +72,75 @@ export async function stageCharacterPublic(root, id) {
   return { manifest, stageDir, publicDir };
 }
 
-export async function runPetCommand({ root = projectRoot, mode, args, spawn = spawnInherited } = {}) {
+export async function selectCharacter(
+  root,
+  { input = process.stdin, output = process.stdout } = {},
+) {
+  if (!input.isTTY || !output.isTTY || typeof input.setRawMode !== "function") {
+    throw new Error("非交互终端必须显式指定角色 id");
+  }
+  const entries = (await readdir(join(root, "characters"), { withFileTypes: true }))
+    .filter((entry) => entry.isDirectory())
+    .sort((left, right) => left.name.localeCompare(right.name));
+  const choices = await Promise.all(entries.map(async ({ name: id }) => ({
+    id,
+    displayName: JSON.parse(await readFile(
+      join(root, "characters", id, "character.json"),
+      "utf8",
+    )).displayName,
+  })));
+  if (choices.length === 0) throw new Error("没有可用的角色包");
+
+  let index = 0;
+  const wasRaw = Boolean(input.isRaw);
+  const render = (moveUp = false) => {
+    if (moveUp) output.write(`\x1b[${choices.length}A`);
+    output.write(`${choices.map((choice, choiceIndex) =>
+      `${choiceIndex === index ? "❯" : " "} ${choice.displayName}`
+    ).join("\n")}\n`);
+  };
+
+  emitKeypressEvents(input);
+  input.setRawMode(true);
+  input.resume();
+  output.write("请选择桌宠角色（↑/↓，Enter 确认）：\n");
+  render();
+  try {
+    return await new Promise((resolveChoice, reject) => {
+      const onKeypress = (_value, key = {}) => {
+        if (key.ctrl && key.name === "c") {
+          input.off("keypress", onKeypress);
+          reject(new Error("已取消"));
+        } else if (key.name === "up" || key.name === "down") {
+          index = (index + (key.name === "up" ? -1 : 1) + choices.length) % choices.length;
+          render(true);
+        } else if (key.name === "return" || key.name === "enter") {
+          input.off("keypress", onKeypress);
+          resolveChoice(choices[index].id);
+        }
+      };
+      input.on("keypress", onKeypress);
+    });
+  } finally {
+    input.setRawMode(wasRaw);
+    if (!wasRaw) input.pause();
+  }
+}
+
+export async function runPetCommand({
+  root = projectRoot,
+  mode,
+  args,
+  spawn = spawnInherited,
+  select = selectCharacter,
+} = {}) {
   if (mode !== "dev" && mode !== "build") throw new Error(`未知命令: ${mode}`);
-  const [id, separator, ...rest] = args ?? [];
-  const forwarded = separator === "--" ? rest : args?.slice(1) ?? [];
+  const supplied = args ?? [];
+  const explicitId = supplied[0] && supplied[0] !== "--" ? supplied[0] : null;
+  const id = explicitId ?? await select(root);
+  const forwarded = explicitId
+    ? supplied[1] === "--" ? supplied.slice(2) : supplied.slice(1)
+    : supplied[0] === "--" ? supplied.slice(1) : supplied;
   const prepared = await prepareCharacterBuild(root, id);
   const tauriCli = join(root, "node_modules", "@tauri-apps", "cli", "tauri.js");
   return spawn(process.execPath, [tauriCli, mode, "--config", prepared.tauriConfigPath, ...forwarded], {
