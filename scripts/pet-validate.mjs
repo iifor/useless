@@ -4,11 +4,17 @@ import { pathToFileURL } from "node:url";
 
 const idlePoses = new Set(["idle-stand", "idle-sit", "idle-prone", "idle-lie"]);
 const capabilities = new Set(["desktop-seat", "file-eating"]);
+const optionalIdleStrips = ["idle-sit", "idle-prone", "idle-lie"];
 const walkStrips = ["walk-slow-left", "walk-slow-right", "walk-slow-up", "walk-slow-down"];
 const capabilityStrips = {
   "desktop-seat": ["search-seat", "search-current-window", "search-desktop-icon", "seat-on-item"],
   "file-eating": ["look-file", "ask-confirm", "eat-normal"],
 };
+const knownAnimationOverrides = new Set([
+  ...optionalIdleStrips,
+  ...walkStrips,
+  ...Object.values(capabilityStrips).flat(),
+]);
 const pngSignature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 
 const isNonBlank = (value) => typeof value === "string" && value.trim() !== "";
@@ -31,6 +37,31 @@ function listErrors(manifest, field, supported, errors, manifestPath) {
   return values.filter((value) => supported.has(value));
 }
 
+function validatedAnimationOverrides(manifest, errors, manifestPath) {
+  const overrides = manifest.animationOverrides ?? {};
+  if (!overrides || typeof overrides !== "object" || Array.isArray(overrides)) {
+    errors.push(`${manifestPath}: animationOverrides must be an object`);
+    return {};
+  }
+  for (const [name, value] of Object.entries(overrides)) {
+    if (!knownAnimationOverrides.has(name)) {
+      errors.push(`${manifestPath}: animationOverrides contains unknown animation ${name}`);
+      continue;
+    }
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      errors.push(`${manifestPath}: animationOverrides.${name} must be an object`);
+      continue;
+    }
+    if (!Number.isInteger(value.frameCount) || value.frameCount < 1 || value.frameCount > 16) {
+      errors.push(`${manifestPath}: animationOverrides.${name}.frameCount must be an integer from 1 to 16`);
+    }
+    if (!Number.isInteger(value.fps) || value.fps < 1 || value.fps > 24) {
+      errors.push(`${manifestPath}: animationOverrides.${name}.fps must be an integer from 1 to 24`);
+    }
+  }
+  return overrides;
+}
+
 async function nonEmpty(path, errors, label) {
   try {
     const info = await stat(path);
@@ -40,7 +71,7 @@ async function nonEmpty(path, errors, label) {
   }
 }
 
-async function validatePngStrip(path, errors, label) {
+async function validatePngStrip(path, errors, label, frameCount = 4) {
   try {
     const file = await open(path, "r");
     const header = Buffer.alloc(29);
@@ -61,7 +92,7 @@ async function validatePngStrip(path, errors, label) {
     const width = header.readUInt32BE(16);
     const height = header.readUInt32BE(20);
     if (width === 0 || height === 0) errors.push(`${label}: PNG dimensions must be positive`);
-    if (width % 4 !== 0) errors.push(`${label}: PNG width must be divisible by 4`);
+    if (width % frameCount !== 0) errors.push(`${label}: PNG width must be divisible by ${frameCount}`);
     if (header[25] !== 6) errors.push(`${label}: PNG must use RGBA color type 6`);
   } catch {
     errors.push(`${label}: missing`);
@@ -95,6 +126,7 @@ export async function validateCharacterPackage(charactersRoot, id) {
 
   const declaredIdlePoses = listErrors(manifest, "idlePoses", idlePoses, errors, manifestPath);
   const declaredCapabilities = listErrors(manifest, "capabilities", capabilities, errors, manifestPath);
+  const animationOverrides = validatedAnimationOverrides(manifest, errors, manifestPath);
   if (!declaredIdlePoses.includes("idle-stand")) errors.push(`${manifestPath}: idlePoses must include idle-stand`);
 
   await nonEmpty(join(packageRoot, "pet", "spritesheet.webp"), errors, pathLabel(charactersRoot, join(packageRoot, "pet", "spritesheet.webp")));
@@ -104,7 +136,8 @@ export async function validateCharacterPackage(charactersRoot, id) {
     ...declaredCapabilities.flatMap((capability) => capabilityStrips[capability]),
   ].map((strip) => {
     const path = join(stripsRoot, `${strip}.png`);
-    return validatePngStrip(path, errors, pathLabel(charactersRoot, path));
+    const frameCount = animationOverrides[strip]?.frameCount ?? 4;
+    return validatePngStrip(path, errors, pathLabel(charactersRoot, path), frameCount);
   }));
   await Promise.all(["icon.png", "icon.icns", "icon.ico"].map((icon) => {
     const path = join(packageRoot, "icons", icon);

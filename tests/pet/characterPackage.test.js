@@ -72,7 +72,10 @@ async function writePackage(root, id = "valid-pet", options = {}) {
   await mkdir(iconsRoot, { recursive: true });
   await writeFile(join(packageRoot, options.characterFile ?? "character.json"), JSON.stringify(value));
   await writeFile(join(petRoot, "spritesheet.webp"), "webp");
-  await Promise.all(strips.map((strip) => writeFile(join(stripsRoot, `${strip}.png`), png(options.png))));
+  await Promise.all(strips.map((strip) => writeFile(
+    join(stripsRoot, `${strip}.png`),
+    png(options.pngByStrip?.[strip] ?? options.png),
+  )));
   await Promise.all([
     writeFile(join(iconsRoot, "icon.png"), "png"),
     writeFile(join(iconsRoot, "icon.icns"), "icns"),
@@ -208,6 +211,58 @@ describe("character packages", () => {
     await writePackage(root, "reduced-pet");
 
     await expect(validateCharacterPackage(join(root, "characters"), "reduced-pet")).resolves.toEqual([]);
+  });
+
+  test("validates each strip against its configured frame count", async () => {
+    const root = await tempRoot();
+    await writePackage(root, "valid-pet", {
+      manifest: {
+        capabilities: ["file-eating"],
+        animationOverrides: {
+          "walk-slow-left": { frameCount: 8, fps: 8 },
+          "eat-normal": { frameCount: 6, fps: 6 },
+        },
+      },
+      pngByStrip: {
+        "walk-slow-left": { width: 16 },
+        "eat-normal": { width: 12 },
+      },
+    });
+
+    await expect(validateCharacterPackage(join(root, "characters"), "valid-pet"))
+      .resolves.toEqual([]);
+  });
+
+  test("rejects a strip width that matches four frames but not its override", async () => {
+    const root = await tempRoot();
+    await writePackage(root, "valid-pet", {
+      manifest: {
+        animationOverrides: {
+          "walk-slow-left": { frameCount: 8, fps: 8 },
+        },
+      },
+      pngByStrip: { "walk-slow-left": { width: 12 } },
+    });
+
+    await expect(validateCharacterPackage(join(root, "characters"), "valid-pet"))
+      .resolves.toEqual(expect.arrayContaining([
+        expect.stringContaining("width must be divisible by 8"),
+      ]));
+  });
+
+  test.each([
+    ["unknown action", { dance: { frameCount: 8, fps: 8 } }, "unknown animation"],
+    ["zero frames", { "walk-slow-left": { frameCount: 0, fps: 8 } }, "frameCount"],
+    ["fractional frames", { "walk-slow-left": { frameCount: 1.5, fps: 8 } }, "frameCount"],
+    ["too many frames", { "walk-slow-left": { frameCount: 17, fps: 8 } }, "frameCount"],
+    ["zero fps", { "walk-slow-left": { frameCount: 8, fps: 0 } }, "fps"],
+    ["fractional fps", { "walk-slow-left": { frameCount: 8, fps: 1.5 } }, "fps"],
+    ["too much fps", { "walk-slow-left": { frameCount: 8, fps: 25 } }, "fps"],
+  ])("rejects animation override %s", async (_name, animationOverrides, expected) => {
+    const root = await tempRoot();
+    await writePackage(root, "valid-pet", { manifest: { animationOverrides } });
+    await expect(validateCharacterPackage(join(root, "characters"), "valid-pet"))
+      .resolves.toEqual(expect.arrayContaining([expect.stringContaining(expected)]));
   });
 
   test("requires character.json instead of manifest.json", async () => {
