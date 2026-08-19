@@ -11,6 +11,7 @@
   "visualQA": {
     "identity": "pass",
     "transparentEdges": "pass",
+    "runtimeBoundaries": "pass",
     "stableScale": "pass",
     "stableBaseline": "pass",
     "loopContinuity": "pass",

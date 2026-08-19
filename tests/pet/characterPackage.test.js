@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawn } from "node:child_process";
+import { inflateSync } from "node:zlib";
 
 import { afterEach, describe, expect, test } from "vitest";
 
@@ -106,6 +107,48 @@ async function expectRepairedStrips(id, repaired) {
   }
 }
 
+async function opaqueBoundaryCounts(path, frameCount) {
+  const file = await readFile(path);
+  const width = file.readUInt32BE(16);
+  const height = file.readUInt32BE(20);
+  const idat = [];
+  for (let offset = 8; offset < file.length;) {
+    const length = file.readUInt32BE(offset);
+    if (file.subarray(offset + 4, offset + 8).toString("ascii") === "IDAT") {
+      idat.push(file.subarray(offset + 8, offset + 8 + length));
+    }
+    offset += 12 + length;
+  }
+  const encoded = inflateSync(Buffer.concat(idat));
+  const stride = width * 4;
+  const rgba = Buffer.alloc(stride * height);
+  const paeth = (left, up, upperLeft) => {
+    const estimate = left + up - upperLeft;
+    const leftDistance = Math.abs(estimate - left);
+    const upDistance = Math.abs(estimate - up);
+    const upperLeftDistance = Math.abs(estimate - upperLeft);
+    return leftDistance <= upDistance && leftDistance <= upperLeftDistance
+      ? left
+      : upDistance <= upperLeftDistance ? up : upperLeft;
+  };
+  for (let y = 0, source = 0; y < height; y += 1) {
+    const filter = encoded[source++];
+    for (let x = 0; x < stride; x += 1) {
+      const left = x >= 4 ? rgba[y * stride + x - 4] : 0;
+      const up = y > 0 ? rgba[(y - 1) * stride + x] : 0;
+      const upperLeft = y > 0 && x >= 4 ? rgba[(y - 1) * stride + x - 4] : 0;
+      const predictor = [0, left, up, Math.floor((left + up) / 2), paeth(left, up, upperLeft)][filter];
+      rgba[y * stride + x] = (encoded[source++] + predictor) & 0xff;
+    }
+  }
+  const slotWidth = width / frameCount;
+  return Array.from({ length: frameCount - 1 }, (_, index) => {
+    const x = slotWidth * (index + 1);
+    return Array.from({ length: height }, (_unused, y) => rgba[y * stride + x * 4 + 3])
+      .filter((alpha) => alpha > 0).length;
+  });
+}
+
 describe("character packages", () => {
   test("ships the approved UNO character packages", async () => {
     const expected = {
@@ -202,13 +245,28 @@ describe("character packages", () => {
       "eat-normal": { frameCount: 6, fps: 6 },
     });
     await expectRepairedStrips("uno-pangyu", {
-      "walk-slow-left.png": { width: 1536, height: 1024, hash: "32121c5baa7ee4f2e6cf5205d5afc906efbec9b21ef76343db460b50fd472ca3" },
-      "walk-slow-right.png": { width: 1536, height: 1024, hash: "15226fe1a91a661280030439ae91a372a2e1d29d616ecb99a28864f0a5d3fe88" },
-      "walk-slow-up.png": { width: 1536, height: 1024, hash: "4fa33e90005a53c1684b4a1d10126ac75bf4dedb14e9fae0b0a9e558c5304924" },
-      "walk-slow-down.png": { width: 1536, height: 1024, hash: "e82eb3f9d745068a1823415fd17ff2e3914d20fce79ffc157a4aba615c710628" },
-      "eat-normal.png": { width: 1536, height: 1024, hash: "5d16ef2115fa2c33d48e8e2e6135c7641685b00d89b176f32b0112e79cba398b" },
+      "walk-slow-left.png": { width: 1536, height: 1024, hash: "c5892ef5597b5f64ed063ebbbb96c0a9edca050f13d2c9ed9ab4c3c27ba3e99b" },
+      "walk-slow-right.png": { width: 1536, height: 1024, hash: "20cdc89d6888124e7cfd5537e16db2bf0e9271e697a4e33ecc45ca2c73076b11" },
+      "walk-slow-up.png": { width: 1536, height: 1024, hash: "c236db37e7d6287fa6e6c5cf8dc2021d000796862833bc73ce2802d273a481fb" },
+      "walk-slow-down.png": { width: 1536, height: 1024, hash: "6fa7d635661f6fc83beb59b4de90aff54817343de72778f8326dba2043824061" },
+      "eat-normal.png": { width: 1536, height: 1024, hash: "b09c3cec12f321d148056c00c6cf5208ae91c1c1cd163678dbcdddc3b78eec8c" },
     });
     await expect(validateCharacterPackage(packageRoot, "uno-pangyu")).resolves.toEqual([]);
+  });
+
+  test("keeps PangYu animation frame boundaries transparent", async () => {
+    for (const [name, frameCount] of Object.entries({
+      "walk-slow-left": 8,
+      "walk-slow-right": 8,
+      "walk-slow-up": 8,
+      "walk-slow-down": 8,
+      "eat-normal": 6,
+    })) {
+      await expect(opaqueBoundaryCounts(
+        join(packageRoot, "uno-pangyu", "pet", "extended-animations", `${name}.png`),
+        frameCount,
+      )).resolves.toEqual(Array(frameCount - 1).fill(0));
+    }
   });
 
   test("keeps retained canonical sources at the public package root", async () => {
