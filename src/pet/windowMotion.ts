@@ -10,6 +10,10 @@ export interface Size {
   height: number;
 }
 
+export interface PetViewport extends Size {
+  originX: number;
+}
+
 export interface Rect extends Point, Size {}
 
 export const physicalWindowSize = (logical: Size, scaleFactor: number): Size => ({
@@ -21,6 +25,31 @@ export const bottomCenter = (position: Point, size: Size): Point => ({
   x: position.x + size.width / 2,
   y: position.y + size.height,
 });
+
+export const petAnchor = (
+  position: Point,
+  windowSize: Size,
+  viewport: PetViewport,
+  scaleFactor: number,
+): Point => ({
+  x: position.x
+    + (windowSize.width - viewport.width * scaleFactor) / 2
+    + viewport.originX * scaleFactor,
+  y: position.y + windowSize.height,
+});
+
+export const windowPositionForPetAnchor = (
+  anchor: Point,
+  windowSize: Size,
+  viewport: PetViewport,
+  scaleFactor: number,
+  workArea: Rect,
+): Point => clampWindowTarget({
+  x: anchor.x
+    - (windowSize.width - viewport.width * scaleFactor) / 2
+    - viewport.originX * scaleFactor,
+  y: anchor.y - windowSize.height,
+}, workArea, windowSize, 0);
 
 export const windowPositionForBottomCenter = (
   anchor: Point,

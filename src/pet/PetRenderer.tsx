@@ -8,12 +8,13 @@ import {
   horizontalContentAnchor,
   normalizedContentScale,
   stripFrameRect,
+  type AnimationViewport,
   type ContentBounds,
 } from "./animation";
 import { ANIMATIONS, contentLongEdgeForPose, type PetPose } from "./animations";
 import { beginPetViewportLayout } from "./WindowMover";
 import { canStartPetDrag, petContextMenuPoint } from "./petInput";
-import type { Point, Size } from "./windowMotion";
+import type { Point } from "./windowMotion";
 
 const ATLAS_CELL_WIDTH = 192;
 const ATLAS_CELL_HEIGHT = 208;
@@ -27,7 +28,7 @@ export interface PetRendererProps {
   onDragStart?: () => void;
   onDragEnd?: () => void | Promise<void>;
   onBodyContextMenu?: (point: Point) => void;
-  onViewportChange?: (size: Size) => void | Promise<void>;
+  onViewportChange?: (viewport: AnimationViewport) => void | Promise<void>;
   dragDisabled?: boolean;
 }
 
@@ -43,7 +44,7 @@ export default function PetRenderer({
 }: PetRendererProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const viewportCallbackRef = useRef(onViewportChange);
-  const lastViewportRef = useRef<Size | null>(null);
+  const lastViewportRef = useRef<AnimationViewport | null>(null);
   viewportCallbackRef.current = onViewportChange;
 
   useEffect(() => {
@@ -146,8 +147,9 @@ export default function PetRenderer({
       originX = viewport.originX;
       originY = viewport.originY;
       if (lastViewportRef.current?.width !== viewport.width
-          || lastViewportRef.current?.height !== viewport.height) {
-        lastViewportRef.current = { width: viewport.width, height: viewport.height };
+          || lastViewportRef.current?.height !== viewport.height
+          || lastViewportRef.current?.originX !== viewport.originX) {
+        lastViewportRef.current = viewport;
         try {
           await viewportCallbackRef.current?.(lastViewportRef.current);
         } catch (error) {

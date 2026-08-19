@@ -5,15 +5,17 @@ import { currentMonitor, getCurrentWindow, Window } from "@tauri-apps/api/window
 import type { Direction } from "./actions";
 import {
   clampWindowTarget,
-  bottomCenter,
   directionForMove,
+  petAnchor,
   physicalWindowSize,
   planWalkPath,
   randomWalkTarget,
   stepTowards,
   windowPositionForBottomCenter,
+  windowPositionForPetAnchor,
   windowPositionForSeatAnchor,
   type Point,
+  type PetViewport,
   type Size,
 } from "./windowMotion";
 
@@ -21,6 +23,7 @@ const SPEED_CSS_PX_PER_SECOND = 36;
 export const INTERACTION_WINDOW_SIZE = { width: 280, height: 320 };
 let seatBubbleOwner = 0;
 let savedCompactAnchor: Point | null = null;
+let activeCompactViewport: PetViewport = { width: 216, height: 216, originX: 108 };
 let layoutQueue: Promise<void> = Promise.resolve();
 let pendingViewportLayout: Promise<void> = Promise.resolve();
 let layoutRequest = 0;
@@ -33,7 +36,7 @@ export function beginPetViewportLayout(): () => void {
   return finish;
 }
 
-export function setPetWindowLayout(compactSize: Size, mode: PetWindowMode): Promise<void> {
+export function setPetWindowLayout(compactSize: PetViewport, mode: PetWindowMode): Promise<void> {
   const request = ++layoutRequest;
   layoutQueue = layoutQueue.catch(() => undefined).then(async () => {
     if (request !== layoutRequest) return;
@@ -48,11 +51,14 @@ export function setPetWindowLayout(compactSize: Size, mode: PetWindowMode): Prom
 
     const desiredLogicalSize = mode === "interaction" ? INTERACTION_WINDOW_SIZE : compactSize;
     const desiredPhysicalSize = physicalWindowSize(desiredLogicalSize, monitor.scaleFactor);
-    const anchor = savedCompactAnchor ?? bottomCenter(position, currentSize);
+    const anchor = savedCompactAnchor
+      ?? petAnchor(position, currentSize, activeCompactViewport, monitor.scaleFactor);
     if (mode === "interaction" && savedCompactAnchor === null) savedCompactAnchor = anchor;
-    const targetPosition = windowPositionForBottomCenter(
+    const targetPosition = windowPositionForPetAnchor(
       anchor,
       desiredPhysicalSize,
+      compactSize,
+      monitor.scaleFactor,
       { ...monitor.workArea.position, ...monitor.workArea.size },
     );
 
@@ -61,6 +67,7 @@ export function setPetWindowLayout(compactSize: Size, mode: PetWindowMode): Prom
       Math.round(targetPosition.x),
       Math.round(targetPosition.y),
     ));
+    activeCompactViewport = compactSize;
     if (mode === "compact") savedCompactAnchor = null;
   });
   return layoutQueue;

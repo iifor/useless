@@ -17,11 +17,13 @@ import {
   clampWindowTarget,
   directionForMove,
   fromBottomCenter,
+  petAnchor,
   physicalWindowSize,
   planWalkPath,
   randomWalkTarget,
   relativeToBottomCenter,
   stepTowards,
+  windowPositionForPetAnchor,
   windowPositionForBottomCenter,
 } from "../../src/pet/windowMotion";
 import { ANIMATIONS, poseForAction } from "../../src/pet/animations";
@@ -151,6 +153,40 @@ describe("action scheduling", () => {
 });
 
 describe("window movement", () => {
+  test("keeps an asymmetric sprite anchor fixed when compact actions change", () => {
+    const oldViewport = { width: 136, height: 90, originX: 31 };
+    const newViewport = { width: 84, height: 120, originX: 47 };
+    const anchor = petAnchor(
+      { x: 400, y: 300 },
+      oldViewport,
+      oldViewport,
+      1,
+    );
+    const nextPosition = windowPositionForPetAnchor(
+      anchor,
+      newViewport,
+      newViewport,
+      1,
+      { x: 0, y: 0, width: 1440, height: 900 },
+    );
+
+    expect(anchor.x).toBe(431);
+    expect(petAnchor(nextPosition, newViewport, newViewport, 1)).toEqual(anchor);
+
+    const retinaOldSize = physicalWindowSize(oldViewport, 2);
+    const retinaNewSize = physicalWindowSize(newViewport, 2);
+    const retinaAnchor = petAnchor({ x: 400, y: 300 }, retinaOldSize, oldViewport, 2);
+    const retinaPosition = windowPositionForPetAnchor(
+      retinaAnchor,
+      retinaNewSize,
+      newViewport,
+      2,
+      { x: 0, y: 0, width: 2880, height: 1800 },
+    );
+
+    expect(petAnchor(retinaPosition, retinaNewSize, newViewport, 2)).toEqual(retinaAnchor);
+  });
+
   test("keeps the same bottom-center anchor when a compact window expands", () => {
     const anchor = bottomCenter({ x: 400, y: 300 }, { width: 100, height: 216 });
     const expandedPosition = windowPositionForBottomCenter(

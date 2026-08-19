@@ -12,6 +12,7 @@ import {
   type Direction,
 } from "./pet/actions";
 import { poseForAction } from "./pet/animations";
+import type { AnimationViewport } from "./pet/animation";
 import { PET_CHARACTER } from "./pet/character";
 import FoodInteraction, {
   beginFoodActivity,
@@ -61,7 +62,6 @@ import {
   fromBottomCenter,
   relativeToBottomCenter,
   type Point,
-  type Size,
 } from "./pet/windowMotion";
 
 const waitForFood = (milliseconds: number) =>
@@ -84,7 +84,12 @@ export default function App() {
   const dragResume = useRef<PetAction | null>(null);
   const foodFlowRef = useRef<FoodFlow>(finishFood());
   const foodActive = useRef(false);
-  const compactSize = useRef<Size>({ width: 216, height: 216 });
+  const compactSize = useRef<AnimationViewport>({
+    width: 216,
+    height: 216,
+    originX: 108,
+    originY: 8,
+  });
   const windowModeRef = useRef<PetWindowMode>("compact");
   const menuRequest = useRef(0);
 
