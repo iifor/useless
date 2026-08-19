@@ -72,6 +72,16 @@ export const ANIMATIONS: Record<PetPose, AnimationSpec> = {
   "eat-normal": strip("/pet/extended-animations/eat-normal.png", 4),
 };
 
+export function animationForPose(
+  character: CharacterManifest,
+  pose: PetPose,
+): AnimationSpec {
+  const override = character.animationOverrides?.[
+    pose as keyof NonNullable<CharacterManifest["animationOverrides"]>
+  ];
+  return override ? { ...ANIMATIONS[pose], ...override } : ANIMATIONS[pose];
+}
+
 const ACTION_FOR_POSE: Record<PetPose, PetAction> = {
   "idle-stand": PetAction.IDLE_STAND,
   "idle-sit": PetAction.IDLE_SIT,

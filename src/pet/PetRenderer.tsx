@@ -11,7 +11,8 @@ import {
   type AnimationViewport,
   type ContentBounds,
 } from "./animation";
-import { ANIMATIONS, contentLongEdgeForPose, type PetPose } from "./animations";
+import { animationForPose, contentLongEdgeForPose, type PetPose } from "./animations";
+import type { CharacterManifest } from "./characterManifest";
 import { beginPetViewportLayout } from "./WindowMover";
 import { canStartPetDrag, petContextMenuPoint } from "./petInput";
 import type { Point } from "./windowMotion";
@@ -22,7 +23,7 @@ const CONTENT_PADDING = 8;
 const DEFAULT_VIEWPORT_SIZE = 216;
 
 export interface PetRendererProps {
-  displayName: string;
+  character: CharacterManifest;
   pose: PetPose;
   scale: number;
   onDragStart?: () => void;
@@ -33,7 +34,7 @@ export interface PetRendererProps {
 }
 
 export default function PetRenderer({
-  displayName,
+  character,
   pose,
   scale,
   onDragStart,
@@ -54,7 +55,7 @@ export default function PetRenderer({
     const context = canvas.getContext("2d", { willReadFrequently: true });
     if (!context) return;
 
-    const spec = ANIMATIONS[pose];
+    const spec = animationForPose(character, pose);
     const targetLongEdge = contentLongEdgeForPose(pose);
     const image = new Image();
     const finishViewportLayout = beginPetViewportLayout();
@@ -169,7 +170,7 @@ export default function PetRenderer({
       window.clearInterval(timer);
       finishViewportLayout();
     };
-  }, [pose, scale]);
+  }, [character, pose, scale]);
 
   const startDragging = async (event: PointerEvent<HTMLCanvasElement>) => {
     if (!canStartPetDrag(
@@ -193,7 +194,7 @@ export default function PetRenderer({
 
   return (
     <canvas
-      aria-label={displayName}
+      aria-label={character.displayName}
       className="pet-canvas"
       height={DEFAULT_VIEWPORT_SIZE}
       onContextMenu={openContextMenu}

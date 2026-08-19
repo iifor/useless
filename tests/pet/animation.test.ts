@@ -13,6 +13,7 @@ import {
 import {
   ANIMATIONS,
   PET_POSES,
+  animationForPose,
   availablePoses,
   contentLongEdgeForPose,
 } from "../../src/pet/animations";
@@ -49,6 +50,18 @@ test("defines a usable animation for every pet pose", () => {
     expect(animation.source).toMatch(/\.(png|webp)$/);
     expect(animation.frameCount).toBeGreaterThan(0);
     expect(animation.fps).toBeGreaterThan(0);
+  }
+});
+
+test("keeps four-frame defaults when a character has no override", () => {
+  for (const pose of [
+    "walk-slow-left",
+    "walk-slow-right",
+    "walk-slow-up",
+    "walk-slow-down",
+    "eat-normal",
+  ] as const) {
+    expect(animationForPose(reducedCharacter, pose).frameCount).toBe(4);
   }
 });
 

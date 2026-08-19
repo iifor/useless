@@ -15,6 +15,8 @@ import {
   rootMenuItemsFor,
 } from "../../src/pet/actionMenu";
 import {
+  ANIMATIONS,
+  animationForPose,
   availablePoses,
   poseForAction,
 } from "../../src/pet/animations";
@@ -102,9 +104,26 @@ describe("character action contract", () => {
     expect(availablePoses(reducedCharacter)).not.toContain("idle-lie");
   });
 
+  test("applies only the selected character's animation overrides", () => {
+    const smootherPangYu = {
+      ...reducedCharacter,
+      animationOverrides: {
+        "walk-slow-left": { frameCount: 8, fps: 8 },
+        "eat-normal": { frameCount: 6, fps: 6 },
+      },
+    };
+
+    expect(animationForPose(smootherPangYu, "walk-slow-left"))
+      .toMatchObject({ frameCount: 8, fps: 8, layout: "strip" });
+    expect(animationForPose(smootherPangYu, "eat-normal"))
+      .toMatchObject({ frameCount: 6, fps: 6, layout: "strip" });
+    expect(animationForPose(reducedCharacter, "walk-slow-left"))
+      .toEqual(ANIMATIONS["walk-slow-left"]);
+  });
+
   test("uses the selected display name for renderer accessibility", () => {
     const renderer = renderToStaticMarkup(createElement(PetRenderer, {
-      displayName: reducedCharacter.displayName,
+      character: reducedCharacter,
       pose: "idle-stand",
       scale: 1,
     }));

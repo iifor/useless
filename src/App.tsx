@@ -364,7 +364,7 @@ export default function App() {
       <div className="pet-stage">
         {shouldRenderSeatMarker(seat) && seat && <SeatIcon kind={seat.kind} />}
         <PetRenderer
-          displayName={PET_CHARACTER.displayName}
+          character={PET_CHARACTER}
           dragDisabled={windowMode === "interaction" || foodActive.current}
           onBodyContextMenu={openMenu}
           onDragEnd={dragEnd}
