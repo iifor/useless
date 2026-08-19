@@ -43,6 +43,7 @@ import {
   type SeatSearchMode,
 } from "./pet/desktopSeat";
 import PetRenderer from "./pet/PetRenderer";
+import { shouldEnableDebugMenu } from "./pet/petInput";
 import { SeatIcon } from "./pet/SeatIcon";
 import {
   INTERACTION_WINDOW_SIZE,
@@ -69,6 +70,7 @@ const waitForFood = (milliseconds: number) =>
 
 const actionMenuItems = actionMenuItemsFor(PET_CHARACTER);
 const rootMenuItems = rootMenuItemsFor(PET_CHARACTER);
+const debugMenuEnabled = shouldEnableDebugMenu(import.meta.env.MODE);
 
 export default function App() {
   const [action, setAction] = useState(PetAction.IDLE_STAND);
@@ -366,7 +368,7 @@ export default function App() {
         <PetRenderer
           character={PET_CHARACTER}
           dragDisabled={windowMode === "interaction" || foodActive.current}
-          onBodyContextMenu={openMenu}
+          onBodyContextMenu={debugMenuEnabled ? openMenu : undefined}
           onDragEnd={dragEnd}
           onDragStart={dragStart}
           onViewportChange={(size) => {
@@ -382,7 +384,7 @@ export default function App() {
           onConfirm={() => decideFood("confirm")}
         />
       </div>
-      {menuPoint && (
+      {debugMenuEnabled && menuPoint && (
         <PetActionMenu
           actionItems={actionMenuItems}
           displayName={PET_CHARACTER.displayName}

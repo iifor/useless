@@ -10,3 +10,5 @@ export const petContextMenuPoint = (
   clientX: number,
   clientY: number,
 ): Point => ({ x: clientX, y: clientY });
+
+export const shouldEnableDebugMenu = (mode: string): boolean => mode === "development";
