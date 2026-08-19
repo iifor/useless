@@ -38,7 +38,7 @@ function listErrors(manifest, field, supported, errors, manifestPath) {
 }
 
 function validatedAnimationOverrides(manifest, errors, manifestPath) {
-  const overrides = manifest.animationOverrides ?? {};
+  const overrides = manifest.animationOverrides === undefined ? {} : manifest.animationOverrides;
   if (!overrides || typeof overrides !== "object" || Array.isArray(overrides)) {
     errors.push(`${manifestPath}: animationOverrides must be an object`);
     return {};

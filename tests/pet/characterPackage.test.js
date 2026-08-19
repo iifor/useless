@@ -333,6 +333,16 @@ describe("character packages", () => {
       ]));
   });
 
+  test("rejects null animation overrides", async () => {
+    const root = await tempRoot();
+    await writePackage(root, "valid-pet", { manifest: { animationOverrides: null } });
+
+    await expect(validateCharacterPackage(join(root, "characters"), "valid-pet"))
+      .resolves.toEqual(expect.arrayContaining([
+        expect.stringContaining("animationOverrides must be an object"),
+      ]));
+  });
+
   test.each([
     ["unknown action", { dance: { frameCount: 8, fps: 8 } }, "unknown animation"],
     ["zero frames", { "walk-slow-left": { frameCount: 0, fps: 8 } }, "frameCount"],
