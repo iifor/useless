@@ -6,5 +6,12 @@
   "bundleId": "com.iifor.uno-pangyu",
   "description": "安静的汉服桌面宠物。",
   "idlePoses": ["idle-stand", "idle-sit"],
+  "animationOverrides": {
+    "walk-slow-left": { "frameCount": 8, "fps": 8 },
+    "walk-slow-right": { "frameCount": 8, "fps": 8 },
+    "walk-slow-up": { "frameCount": 8, "fps": 8 },
+    "walk-slow-down": { "frameCount": 8, "fps": 8 },
+    "eat-normal": { "frameCount": 6, "fps": 6 }
+  },
   "capabilities": ["desktop-seat", "file-eating"]
 }

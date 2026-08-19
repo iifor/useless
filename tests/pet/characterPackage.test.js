@@ -122,6 +122,13 @@ describe("character packages", () => {
         bundleId: "com.iifor.uno-pangyu",
         description: "安静的汉服桌面宠物。",
         idlePoses: ["idle-stand", "idle-sit"],
+        animationOverrides: {
+          "walk-slow-left": { frameCount: 8, fps: 8 },
+          "walk-slow-right": { frameCount: 8, fps: 8 },
+          "walk-slow-up": { frameCount: 8, fps: 8 },
+          "walk-slow-down": { frameCount: 8, fps: 8 },
+          "eat-normal": { frameCount: 6, fps: 6 },
+        },
       },
       "uno-yan": {
         displayName: "UNO Yan",
@@ -172,18 +179,36 @@ describe("character packages", () => {
   test("trims only PangYu's transparent trailing atlas columns", async () => {
     const repaired = {
       "idle-sit.png": { width: 1772, height: 887, hash: "4aeb031542e642f575e9256b6e844c76f94cdeb43e88a2f56d8d911a5dc3ace3" },
-      "walk-slow-up.png": { width: 1464, height: 1073, hash: "b7c634d47c343821c95f9132388e52d9080ce4047b511a38e6196052ba39560f" },
       "search-seat.png": { width: 1980, height: 793, hash: "3b62f9f73d3b92c01f283b947afd8f6f1b57cd0bd97d30daeab6c4cffd613092" },
       "search-current-window.png": { width: 1772, height: 887, hash: "903ade0c789892f35edee37b5a170b8d03e8cd9a9271496f75c2b53f425089c3" },
       "search-desktop-icon.png": { width: 1772, height: 887, hash: "e25529e498389f7e0553748ce035b61be28868974f48ba7c8e4d9152f1c2dd83" },
       "seat-on-item.png": { width: 1584, height: 992, hash: "ef1a39cd7465eb582de05bdb14dc70b69f0948398732040064fefc4a8d6303ab" },
-      "walk-slow-left.png": { width: 1772, height: 887, hash: "73e9ce8c1219c0b2992050c4491be8b05687e3c095485a1339053a437251ca24" },
-      "walk-slow-right.png": { width: 1772, height: 887, hash: "3e27ef2666d516b29e725f8c29afc22058d593c190d1ffb1bd3c4cfc393e3a6f" },
       "ask-confirm.png": { width: 1656, height: 948, hash: "a34e24197eb38dc744e2007f487dc52e2c07f0184b12e98e2b0a354b98796f86" },
-      "eat-normal.png": { width: 1704, height: 923, hash: "5e3507480d8f27b8d2681dac60b2bc7de4dca0156e28732988d18e538533648b" },
     };
 
     await expectRepairedStrips("uno-pangyu", repaired);
+  });
+
+  test("ships PangYu's approved smoother animation contract", async () => {
+    const pangYu = JSON.parse(await readFile(
+      join(packageRoot, "uno-pangyu", "character.json"),
+      "utf8",
+    ));
+    expect(pangYu.animationOverrides).toEqual({
+      "walk-slow-left": { frameCount: 8, fps: 8 },
+      "walk-slow-right": { frameCount: 8, fps: 8 },
+      "walk-slow-up": { frameCount: 8, fps: 8 },
+      "walk-slow-down": { frameCount: 8, fps: 8 },
+      "eat-normal": { frameCount: 6, fps: 6 },
+    });
+    await expectRepairedStrips("uno-pangyu", {
+      "walk-slow-left.png": { width: 1536, height: 1024, hash: "32121c5baa7ee4f2e6cf5205d5afc906efbec9b21ef76343db460b50fd472ca3" },
+      "walk-slow-right.png": { width: 1536, height: 1024, hash: "15226fe1a91a661280030439ae91a372a2e1d29d616ecb99a28864f0a5d3fe88" },
+      "walk-slow-up.png": { width: 1536, height: 1024, hash: "4fa33e90005a53c1684b4a1d10126ac75bf4dedb14e9fae0b0a9e558c5304924" },
+      "walk-slow-down.png": { width: 1536, height: 1024, hash: "e82eb3f9d745068a1823415fd17ff2e3914d20fce79ffc157a4aba615c710628" },
+      "eat-normal.png": { width: 1536, height: 1024, hash: "5d16ef2115fa2c33d48e8e2e6135c7641685b00d89b176f32b0112e79cba398b" },
+    });
+    await expect(validateCharacterPackage(packageRoot, "uno-pangyu")).resolves.toEqual([]);
   });
 
   test("keeps retained canonical sources at the public package root", async () => {

@@ -1,0 +1,19 @@
+{
+  "ok": true,
+  "identityReference": "../../canonical-base.png",
+  "animations": {
+    "walk-slow-left": { "frameCount": 8, "fps": 8 },
+    "walk-slow-right": { "frameCount": 8, "fps": 8 },
+    "walk-slow-up": { "frameCount": 8, "fps": 8 },
+    "walk-slow-down": { "frameCount": 8, "fps": 8 },
+    "eat-normal": { "frameCount": 6, "fps": 6 }
+  },
+  "visualQA": {
+    "identity": "pass",
+    "transparentEdges": "pass",
+    "stableScale": "pass",
+    "stableBaseline": "pass",
+    "loopContinuity": "pass",
+    "horizontalFlash": "pass"
+  }
+}
