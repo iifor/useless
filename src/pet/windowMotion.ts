@@ -16,6 +16,8 @@ export interface PetViewport extends Size {
 
 export interface Rect extends Point, Size {}
 
+export const WINDOW_SEAT_OFFSET_CSS = 0;
+
 export const physicalWindowSize = (logical: Size, scaleFactor: number): Size => ({
   width: Math.round(logical.width * scaleFactor),
   height: Math.round(logical.height * scaleFactor),

@@ -60,6 +60,7 @@ import {
   type PetWindowMode,
 } from "./pet/WindowMover";
 import {
+  WINDOW_SEAT_OFFSET_CSS,
   fromBottomCenter,
   relativeToBottomCenter,
   type Point,
@@ -127,7 +128,10 @@ export default function App() {
         await waitForPetWindowLayout();
         if (!isCurrent()) return;
         let destination = target.seatAnchor
-          ? await seatWindowDestination(target.seatAnchor, target.kind === "window" ? -8 : 0)
+          ? await seatWindowDestination(
+            target.seatAnchor,
+            target.kind === "window" ? WINDOW_SEAT_OFFSET_CSS : 0,
+          )
           : await randomWindowDestination();
         if (!isCurrent()) return;
         if (shouldRenderSeatMarker(target)) {
@@ -157,7 +161,7 @@ export default function App() {
           if (seatTargetChanged(target, refreshed)) {
             target = refreshed;
             await moveWindowTo(
-              await seatWindowDestination(refreshed.seatAnchor, -8),
+              await seatWindowDestination(refreshed.seatAnchor, WINDOW_SEAT_OFFSET_CSS),
               signal,
               (value) => { if (isCurrent()) setDirection(value); },
             );

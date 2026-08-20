@@ -11,7 +11,10 @@ import {
   type DesktopSeatTarget,
 } from "../../src/pet/desktopSeat";
 import { PetAction } from "../../src/pet/actions";
-import { windowPositionForSeatAnchor } from "../../src/pet/windowMotion";
+import {
+  WINDOW_SEAT_OFFSET_CSS,
+  windowPositionForSeatAnchor,
+} from "../../src/pet/windowMotion";
 
 const icon = target("file", "file");
 const windowSeat = target("window", "window");
@@ -119,6 +122,21 @@ test("moves a window seat upward by the supplied physical offset", () => {
     { x: 0, y: 0, width: 3200, height: 2000 },
     -16,
   )).toEqual({ x: 880, y: 384 });
+});
+
+test("aligns the calibrated window seat with the window top edge", () => {
+  expect(windowPositionForSeatAnchor(
+    { x: 500, y: 400 },
+    { width: 120, height: 200 },
+    { x: 0, y: 0, width: 1600, height: 1000 },
+    WINDOW_SEAT_OFFSET_CSS,
+  )).toEqual({ x: 440, y: 200 });
+  expect(windowPositionForSeatAnchor(
+    { x: 1000, y: 800 },
+    { width: 240, height: 400 },
+    { x: 0, y: 0, width: 3200, height: 2000 },
+    WINDOW_SEAT_OFFSET_CSS * 2,
+  )).toEqual({ x: 880, y: 400 });
 });
 
 function target(kind: "file" | "window", id: string): DesktopSeatTarget {
