@@ -461,8 +461,10 @@ async fn platform_desktop_items(
     const SCRIPT: &str = r#"
 tell application "Finder"
   set outputText to ""
-  repeat with desktopItem in every item of desktop
+  set desktopItems to every item of desktop
+  repeat with desktopItemRef in desktopItems
     try
+      set desktopItem to contents of desktopItemRef
       set itemPath to POSIX path of (desktopItem as alias)
       set itemBounds to bounds of desktopItem
       set outputText to outputText & itemPath & tab & (item 1 of itemBounds as text) & tab & (item 2 of itemBounds as text) & tab & (item 3 of itemBounds as text) & tab & (item 4 of itemBounds as text) & linefeed
