@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::{fs, path::PathBuf};
+use std::{collections::HashMap, fs, path::PathBuf};
 use tauri::{AppHandle, Manager};
 
 use crate::food_safety::{is_application_name, is_os_hidden};
@@ -47,6 +47,74 @@ impl Rect {
 struct FinderItem {
     path: String,
     bounds: Rect,
+}
+
+#[derive(Clone, Debug)]
+struct AccessibleDesktopItem {
+    name: String,
+    bounds: Rect,
+}
+
+fn is_desktop_accessibility_window(
+    title: Option<&str>,
+    desktop_title: &str,
+    role: Option<&str>,
+    subrole: Option<&str>,
+    bounds: Option<Rect>,
+    work_area: Rect,
+) -> bool {
+    let Some(bounds) = bounds else { return false };
+    title == Some(desktop_title)
+        && role == Some("AXWindow")
+        && subrole != Some("AXStandardWindow")
+        && bounds.width >= work_area.width * 0.95
+        && bounds.height >= work_area.height * 0.95
+        && bounds.contains(Point {
+            x: work_area.x + work_area.width / 2.0,
+            y: work_area.y + work_area.height / 2.0,
+        })
+}
+
+fn match_accessible_desktop_items(
+    paths: Vec<PathBuf>,
+    icons: Vec<AccessibleDesktopItem>,
+) -> Vec<FinderItem> {
+    let mut paths_by_name: HashMap<String, Vec<PathBuf>> = HashMap::new();
+    for path in paths {
+        let mut file_name = None;
+        if let Some(name) = path.file_name() {
+            let name = name.to_string_lossy().to_lowercase();
+            paths_by_name
+                .entry(name.clone())
+                .or_default()
+                .push(path.clone());
+            file_name = Some(name);
+        }
+        if let Some(stem) = path.file_stem() {
+            let stem = stem.to_string_lossy().to_lowercase();
+            if file_name.as_deref() == Some(&stem) {
+                continue;
+            }
+            paths_by_name.entry(stem).or_default().push(path);
+        }
+    }
+    let mut icons_by_name: HashMap<String, Vec<AccessibleDesktopItem>> = HashMap::new();
+    for icon in icons {
+        icons_by_name
+            .entry(icon.name.to_lowercase())
+            .or_default()
+            .push(icon);
+    }
+    icons_by_name
+        .into_iter()
+        .filter_map(|(name, icons)| {
+            let paths = paths_by_name.get(&name)?;
+            (icons.len() == 1 && paths.len() == 1).then(|| FinderItem {
+                path: paths[0].to_string_lossy().into_owned(),
+                bounds: icons[0].bounds,
+            })
+        })
+        .collect()
 }
 
 #[derive(Clone, Debug)]
@@ -160,6 +228,11 @@ pub enum SeatSearchMode {
     Auto,
     FocusedWindow,
     DesktopIcon,
+    DesktopIconSilent,
+}
+
+fn should_prompt_for_accessibility(mode: SeatSearchMode) -> bool {
+    mode == SeatSearchMode::DesktopIcon
 }
 
 fn target_context(app: &AppHandle) -> Result<TargetContext, String> {
@@ -201,7 +274,7 @@ pub async fn find_seat_targets(
         .filter(|window| window.visible && !window.minimized && !window.tool)
         .map(|window| window.bounds)
         .collect();
-    match platform_desktop_items(&app, &context).await {
+    match platform_desktop_items(&app, &context, mode).await {
         Ok(items) => Ok(desktop_item_targets(items, context.work_area, &occluders)),
         Err(error) => {
             eprintln!("桌面图标坐标不可用，将使用自建座位: {error}");
@@ -268,6 +341,7 @@ fn desktop_item_targets(
         .collect()
 }
 
+#[cfg(any(windows, test))]
 fn parse_finder_items(value: &str) -> Vec<FinderItem> {
     value
         .lines()
@@ -328,7 +402,7 @@ fn window_target_for_mode(windows: &[WindowTarget], mode: SeatSearchMode) -> Opt
         SeatSearchMode::FocusedWindow => {
             focused_window_target(windows).or_else(|| windows.first().cloned())
         }
-        SeatSearchMode::DesktopIcon => None,
+        SeatSearchMode::DesktopIcon | SeatSearchMode::DesktopIconSilent => None,
     }
 }
 
@@ -454,51 +528,194 @@ fn platform_windows(context: &TargetContext) -> Result<Vec<RawWindow>, String> {
 async fn platform_desktop_items(
     app: &AppHandle,
     context: &TargetContext,
+    mode: SeatSearchMode,
 ) -> Result<Vec<FinderItem>, String> {
-    use osakit::{Language, Script, Value};
-    use std::sync::mpsc::sync_channel;
+    use core_foundation::{
+        array::CFArray,
+        base::{CFType, CFTypeRef, TCFType},
+        boolean::CFBoolean,
+        dictionary::{CFDictionary, CFDictionaryRef},
+        string::{CFString, CFStringRef},
+    };
+    use core_graphics::geometry::CGRect;
+    use objc2_app_kit::NSWorkspace;
+    use objc2_foundation::{NSFileManager, NSString};
+    use std::{ffi::c_void, ptr};
 
-    const SCRIPT: &str = r#"
-tell application "Finder"
-  set outputText to ""
-  set desktopItems to every item of desktop
-  repeat with desktopItemRef in desktopItems
-    try
-      set desktopItem to contents of desktopItemRef
-      set itemPath to POSIX path of (desktopItem as alias)
-      set itemBounds to bounds of desktopItem
-      set outputText to outputText & itemPath & tab & (item 1 of itemBounds as text) & tab & (item 2 of itemBounds as text) & tab & (item 3 of itemBounds as text) & tab & (item 4 of itemBounds as text) & linefeed
-    end try
-  end repeat
-  return outputText
-end tell
-"#;
+    const AX_ERROR_SUCCESS: i32 = 0;
+    const AX_VALUE_CGRECT_TYPE: u32 = 3;
 
-    let (sender, receiver) = sync_channel(1);
-    app.run_on_main_thread(move || {
-        let result = (|| {
-            let mut script = Script::new_from_source(Language::AppleScript, SCRIPT);
-            script.compile().map_err(|error| error.to_string())?;
-            match script.execute().map_err(|error| error.to_string())? {
-                Value::String(value) => Ok(value),
-                _ => Err("Finder 返回了无法识别的桌面坐标".to_owned()),
+    #[link(name = "ApplicationServices", kind = "framework")]
+    extern "C" {
+        fn AXIsProcessTrusted() -> u8;
+        fn AXIsProcessTrustedWithOptions(options: CFDictionaryRef) -> u8;
+        fn AXUIElementCreateApplication(pid: i32) -> CFTypeRef;
+        fn AXUIElementCopyAttributeValue(
+            element: CFTypeRef,
+            attribute: CFStringRef,
+            value: *mut CFTypeRef,
+        ) -> i32;
+        fn AXValueGetValue(value: CFTypeRef, value_type: u32, output: *mut c_void) -> u8;
+        static kAXTrustedCheckOptionPrompt: CFStringRef;
+    }
+
+    fn trusted(prompt: bool) -> bool {
+        unsafe {
+            if !prompt {
+                return AXIsProcessTrusted() != 0;
             }
-        })();
-        let _ = sender.send(result);
-    })
-    .map_err(|error| error.to_string())?;
+            let key = CFString::wrap_under_get_rule(kAXTrustedCheckOptionPrompt);
+            let options = CFDictionary::from_CFType_pairs(&[(key, CFBoolean::true_value())]);
+            AXIsProcessTrustedWithOptions(options.as_concrete_TypeRef()) != 0
+        }
+    }
 
-    let output = tauri::async_runtime::spawn_blocking(move || receiver.recv())
-        .await
+    fn attribute(element: CFTypeRef, name: &str) -> Option<CFType> {
+        let name = CFString::new(name);
+        let mut value = ptr::null();
+        (unsafe { AXUIElementCopyAttributeValue(element, name.as_concrete_TypeRef(), &mut value) }
+            == AX_ERROR_SUCCESS
+            && !value.is_null())
+        .then(|| unsafe { CFType::wrap_under_create_rule(value) })
+    }
+
+    fn string_attribute(element: CFTypeRef, name: &str) -> Option<String> {
+        attribute(element, name)?
+            .downcast::<CFString>()
+            .map(|value| value.to_string())
+            .filter(|value| !value.is_empty())
+    }
+
+    fn frame(element: CFTypeRef) -> Option<Rect> {
+        let value = attribute(element, "AXFrame")?;
+        let mut frame: CGRect = unsafe { std::mem::zeroed() };
+        if unsafe {
+            AXValueGetValue(
+                value.as_CFTypeRef(),
+                AX_VALUE_CGRECT_TYPE,
+                (&mut frame as *mut CGRect).cast(),
+            )
+        } == 0
+        {
+            return None;
+        }
+        let rect = Rect::new(
+            frame.origin.x,
+            frame.origin.y,
+            frame.size.width,
+            frame.size.height,
+        );
+        (rect.x.is_finite()
+            && rect.y.is_finite()
+            && rect.width.is_finite()
+            && rect.height.is_finite()
+            && rect.width > 0.0
+            && rect.height > 0.0)
+            .then_some(rect)
+    }
+
+    fn collect_icons(
+        element: CFTypeRef,
+        depth: usize,
+        remaining: &mut usize,
+        output: &mut Vec<AccessibleDesktopItem>,
+    ) {
+        if depth > 12 || *remaining == 0 {
+            return;
+        }
+        *remaining -= 1;
+        if string_attribute(element, "AXRole").as_deref() == Some("AXImage") {
+            let name = string_attribute(element, "AXTitle")
+                .or_else(|| string_attribute(element, "AXDescription"))
+                .or_else(|| string_attribute(element, "AXValue"));
+            if let (Some(name), Some(bounds)) = (name, frame(element)) {
+                output.push(AccessibleDesktopItem { name, bounds });
+            }
+        }
+        let Some(children) =
+            attribute(element, "AXChildren").and_then(|value| value.downcast::<CFArray>())
+        else {
+            return;
+        };
+        for child in children.get_all_values() {
+            collect_icons(child.cast(), depth + 1, remaining, output);
+        }
+    }
+
+    if !trusted(should_prompt_for_accessibility(mode)) {
+        return Err("需要在系统设置 → 隐私与安全性 → 辅助功能中允许此桌宠，然后重新查找".into());
+    }
+    let desktop = app
+        .path()
+        .desktop_dir()
+        .map_err(|error| error.to_string())?;
+    let desktop_title = NSFileManager::defaultManager()
+        .displayNameAtPath(&NSString::from_str(&desktop.to_string_lossy()))
+        .to_string();
+    let paths = fs::read_dir(desktop)
         .map_err(|error| error.to_string())?
-        .map_err(|error| error.to_string())??;
-    Ok(parse_finder_items(&output)
-        .into_iter()
-        .map(|mut item| {
-            item.bounds = logical_to_physical(item.bounds, context);
-            item
-        })
-        .collect())
+        .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+        .collect::<Vec<_>>();
+    let scale_factor = context.scale_factor;
+    let work_area = context.work_area;
+    let logical_work_area = Rect::new(
+        work_area.x / scale_factor,
+        work_area.y / scale_factor,
+        work_area.width / scale_factor,
+        work_area.height / scale_factor,
+    );
+    tauri::async_runtime::spawn_blocking(move || {
+        let finder_pid = NSWorkspace::sharedWorkspace()
+            .runningApplications()
+            .iter()
+            .find(|application| {
+                application
+                    .bundleIdentifier()
+                    .is_some_and(|identifier| identifier.to_string() == "com.apple.finder")
+            })
+            .map(|application| application.processIdentifier())
+            .ok_or_else(|| "Finder 未运行".to_owned())?;
+        let application = unsafe { AXUIElementCreateApplication(finder_pid) };
+        if application.is_null() {
+            return Err("无法连接 Finder 辅助功能树".to_owned());
+        }
+        let application = unsafe { CFType::wrap_under_create_rule(application) };
+        let mut icons = Vec::new();
+        let windows = attribute(application.as_CFTypeRef(), "AXWindows")
+            .and_then(|value| value.downcast::<CFArray>());
+        if let Some(windows) = windows {
+            for window in windows.get_all_values() {
+                let window = window.cast();
+                let title = string_attribute(window, "AXTitle");
+                let role = string_attribute(window, "AXRole");
+                let subrole = string_attribute(window, "AXSubrole");
+                if is_desktop_accessibility_window(
+                    title.as_deref(),
+                    &desktop_title,
+                    role.as_deref(),
+                    subrole.as_deref(),
+                    frame(window),
+                    logical_work_area,
+                ) {
+                    collect_icons(window, 0, &mut 10_000, &mut icons);
+                    break;
+                }
+            }
+        }
+        let context = TargetContext {
+            work_area,
+            scale_factor,
+        };
+        Ok(match_accessible_desktop_items(paths, icons)
+            .into_iter()
+            .map(|mut item| {
+                item.bounds = logical_to_physical(item.bounds, &context);
+                item
+            })
+            .collect())
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[cfg(windows)]
@@ -595,6 +812,7 @@ fn platform_windows(_context: &TargetContext) -> Result<Vec<RawWindow>, String> 
 async fn platform_desktop_items(
     app: &AppHandle,
     _context: &TargetContext,
+    _mode: SeatSearchMode,
 ) -> Result<Vec<FinderItem>, String> {
     use std::{collections::HashMap, os::windows::process::CommandExt, process::Command};
 
@@ -669,6 +887,7 @@ fn platform_windows(_context: &TargetContext) -> Result<Vec<RawWindow>, String> 
 async fn platform_desktop_items(
     _app: &AppHandle,
     _context: &TargetContext,
+    _mode: SeatSearchMode,
 ) -> Result<Vec<FinderItem>, String> {
     Ok(Vec::new())
 }
@@ -691,7 +910,23 @@ mod tests {
             serde_json::from_str::<SeatSearchMode>(r#""desktop-icon""#).unwrap(),
             SeatSearchMode::DesktopIcon
         );
+        assert_eq!(
+            serde_json::from_str::<SeatSearchMode>(r#""desktop-icon-silent""#).unwrap(),
+            SeatSearchMode::DesktopIconSilent
+        );
         assert!(serde_json::from_str::<SeatSearchMode>(r#""unknown""#).is_err());
+    }
+
+    #[test]
+    fn prompts_for_accessibility_only_for_manual_desktop_icon_search() {
+        assert!(should_prompt_for_accessibility(SeatSearchMode::DesktopIcon));
+        assert!(!should_prompt_for_accessibility(SeatSearchMode::Auto));
+        assert!(!should_prompt_for_accessibility(
+            SeatSearchMode::FocusedWindow
+        ));
+        assert!(!should_prompt_for_accessibility(
+            SeatSearchMode::DesktopIconSilent
+        ));
     }
 
     #[test]
@@ -700,6 +935,81 @@ mod tests {
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].path, "/Users/me/Desktop/a.txt");
         assert_eq!(items[0].bounds, Rect::new(100.0, 200.0, 64.0, 64.0));
+    }
+
+    #[test]
+    fn matches_accessible_icon_names_to_unique_desktop_paths() {
+        let items = match_accessible_desktop_items(
+            vec![
+                PathBuf::from("/Users/me/Desktop/report.txt"),
+                PathBuf::from("/Users/me/Desktop/folder"),
+                PathBuf::from("/Users/me/Desktop/photo.png"),
+                PathBuf::from("/Users/me/Desktop/photo.jpg"),
+            ],
+            vec![
+                AccessibleDesktopItem {
+                    name: "report".into(),
+                    bounds: Rect::new(100.0, 200.0, 64.0, 64.0),
+                },
+                AccessibleDesktopItem {
+                    name: "photo".into(),
+                    bounds: Rect::new(300.0, 200.0, 64.0, 64.0),
+                },
+                AccessibleDesktopItem {
+                    name: "folder".into(),
+                    bounds: Rect::new(500.0, 200.0, 64.0, 64.0),
+                },
+            ],
+        );
+
+        assert_eq!(items.len(), 2);
+        assert!(items.iter().any(|item| {
+            item.path == "/Users/me/Desktop/report.txt"
+                && item.bounds == Rect::new(100.0, 200.0, 64.0, 64.0)
+        }));
+        assert!(items.iter().any(|item| {
+            item.path == "/Users/me/Desktop/folder"
+                && item.bounds == Rect::new(500.0, 200.0, 64.0, 64.0)
+        }));
+    }
+
+    #[test]
+    fn accepts_only_the_nonstandard_full_screen_finder_desktop_window() {
+        let work_area = Rect::new(0.0, 25.0, 1440.0, 875.0);
+        let full_screen = Some(Rect::new(0.0, 0.0, 1440.0, 900.0));
+
+        assert!(is_desktop_accessibility_window(
+            Some("Desktop"),
+            "Desktop",
+            Some("AXWindow"),
+            None,
+            full_screen,
+            work_area,
+        ));
+        assert!(!is_desktop_accessibility_window(
+            Some("Desktop"),
+            "Desktop",
+            Some("AXWindow"),
+            Some("AXStandardWindow"),
+            full_screen,
+            work_area,
+        ));
+        assert!(!is_desktop_accessibility_window(
+            Some("Desktop"),
+            "Desktop",
+            Some("AXWindow"),
+            None,
+            Some(Rect::new(200.0, 100.0, 900.0, 700.0)),
+            work_area,
+        ));
+        assert!(!is_desktop_accessibility_window(
+            Some("Downloads"),
+            "Desktop",
+            Some("AXWindow"),
+            None,
+            full_screen,
+            work_area,
+        ));
     }
 
     #[test]

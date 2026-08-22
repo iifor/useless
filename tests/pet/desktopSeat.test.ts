@@ -6,6 +6,7 @@ import {
   isPendingOwnedSeat,
   materializeOwnedSeatTarget,
   seatSearchModeForAction,
+  seatSearchModeForOwnedMaterialization,
   seatTargetChanged,
   shouldRenderSeatMarker,
   type DesktopSeatTarget,
@@ -40,11 +41,13 @@ describe("desktop seat selection", () => {
     expect(seatSearchModeForAction(PetAction.SEARCH_CURRENT_WINDOW)).toBe("focused-window");
     expect(seatSearchModeForAction(PetAction.SEARCH_DESKTOP_ICON)).toBe("desktop-icon");
     expect(seatSearchModeForAction(PetAction.IDLE_STAND)).toBeNull();
+    expect(seatSearchModeForOwnedMaterialization()).toBe("desktop-icon-silent");
   });
 
   test("creates an owned seat only after arrival and never after a failed arrival", async () => {
     const pending = chooseSeatTarget([], "auto", values(0))!;
     const events: string[] = [];
+    const searchModes: string[] = [];
     const materialize = (target: DesktopSeatTarget) => materializeOwnedSeatTarget(
       target,
       async () => {
@@ -59,7 +62,10 @@ describe("desktop seat selection", () => {
           virtualMarker: true,
         };
       },
-      async () => [],
+      async (mode) => {
+        searchModes.push(mode);
+        return [];
+      },
       async () => undefined,
     );
 
@@ -69,6 +75,7 @@ describe("desktop seat selection", () => {
       materialize,
     );
     expect(events).toEqual(["arrive", "create"]);
+    expect(searchModes).toEqual(Array(4).fill("desktop-icon-silent"));
     expect(created.path).toBe("/Desktop/宠物的座位.tmp");
 
     events.length = 0;

@@ -4,7 +4,11 @@ import { PetAction } from "./actions";
 import type { Point } from "./windowMotion";
 
 export type SeatKind = "file" | "folder" | "owned-temp" | "window" | "virtual";
-export type SeatSearchMode = "auto" | "focused-window" | "desktop-icon";
+export type SeatSearchMode =
+  | "auto"
+  | "focused-window"
+  | "desktop-icon"
+  | "desktop-icon-silent";
 
 export interface SeatAnchor extends Point {}
 
@@ -56,7 +60,9 @@ export function chooseSeatTarget(
     return windows[Math.floor(random() * windows.length)] ?? null;
   }
   const icons = candidates.filter(({ kind }) => kind !== "window");
-  if (mode === "desktop-icon") return icons[Math.floor(random() * icons.length)] ?? null;
+  if (mode === "desktop-icon" || mode === "desktop-icon-silent") {
+    return icons[Math.floor(random() * icons.length)] ?? null;
+  }
   const focused = candidates.find(({ kind, focused }) => kind === "window" && focused);
   return focused ?? icons[Math.floor(random() * icons.length)] ?? PENDING_OWNED_SEAT;
 }
@@ -70,6 +76,9 @@ export function seatSearchModeForAction(action: PetAction): SeatSearchMode | nul
   if (action === PetAction.SEARCH_DESKTOP_ICON) return "desktop-icon";
   return null;
 }
+
+export const seatSearchModeForOwnedMaterialization = (): SeatSearchMode =>
+  "desktop-icon-silent";
 
 export const shouldRenderSeatMarker = (target: DesktopSeatTarget | null): boolean =>
   target?.virtualMarker === true;
@@ -102,8 +111,8 @@ export async function findSeatTarget(
 export async function materializeOwnedSeatTarget(
   target: DesktopSeatTarget,
   create: () => Promise<DesktopSeatTarget> = () => invoke("create_owned_seat_file"),
-  find: () => Promise<DesktopSeatTarget[]> = () =>
-    desktopItemProvider.findSeatCandidates("desktop-icon"),
+  find: (mode: SeatSearchMode) => Promise<DesktopSeatTarget[]> = (mode) =>
+    desktopItemProvider.findSeatCandidates(mode),
   sleep: (milliseconds: number) => Promise<void> = (milliseconds) =>
     new Promise((resolve) => window.setTimeout(resolve, milliseconds)),
 ): Promise<DesktopSeatTarget> {
@@ -112,7 +121,7 @@ export async function materializeOwnedSeatTarget(
     const owned = await create();
     for (let attempt = 0; attempt < 4; attempt += 1) {
       await sleep(500);
-      const discovered = await find()
+      const discovered = await find(seatSearchModeForOwnedMaterialization())
         .then((targets) => targets.find(({ path }) => path === owned.path))
         .catch(() => undefined);
       if (discovered?.seatAnchor) {
